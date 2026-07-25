@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Platform - Tenant{% endblock %}
+{% block page_title %}Platform Administration{% endblock %}
+
+{% block content %}
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div>
+        <h2 class="text-lg font-semibold">Tenant</h2>
+        <p class="text-sm text-slate-500">Admission tenant dan pendaftaran user tenant dilakukan oleh superadmin.</p>
+    </div>
+    <div class="flex gap-2">
+        <a class="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700" href="{% url 'platform_tenant_admission' %}">Admission Tenant</a>
+        <a class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" href="{% url 'platform_tenant_user_create' %}">Tambah User Tenant</a>
+    </div>
+</div>
+
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">Tenant</th>
+                <th class="px-4 py-3 font-medium">Logo</th>
+                <th class="px-4 py-3 font-medium">Kontak</th>
+                <th class="px-4 py-3 font-medium">Status</th>
+                <th class="px-4 py-3 font-medium">User</th>
+                <th class="px-4 py-3 font-medium"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for tenant in tenants %}
+            <tr>
+                <td class="px-4 py-3">
+                    <div class="font-medium">{{ tenant.name }}</div>
+                    <div class="text-slate-500">{{ tenant.city }}{% if tenant.province %}, {{ tenant.province }}{% endif %}</div>
+                </td>
+                <td class="px-4 py-3">{% if tenant.logo %}<img class="h-10 max-w-24 object-contain" src="{{ tenant.logo.url }}" alt="Logo {{ tenant.name }}">{% else %}<span class="text-slate-500">-</span>{% endif %}</td>
+                <td class="px-4 py-3 text-slate-600">
+                    <div>{{ tenant.email|default:"-" }}</div>
+                    <div>{{ tenant.phone|default:"-" }}</div>
+                </td>
+                <td class="px-4 py-3">
+                    {% if tenant.is_active %}
+                    <span class="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700">Aktif</span>
+                    {% else %}
+                    <span class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">Nonaktif</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    {% for profile in tenant.user_profiles.all %}
+                    <div>{{ profile.user.username }} <span class="text-slate-500">({{ profile.get_role_display }})</span></div>
+                    {% empty %}
+                    <span class="text-slate-500">Belum ada user</span>
+                    {% endfor %}
+                </td>
+                <td class="px-4 py-3 text-right"><a class="text-sm text-slate-700 hover:underline" href="{% url 'platform_tenant_edit' tenant.pk %}">Edit</a></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td class="px-4 py-6 text-center text-slate-500" colspan="6">Belum ada tenant.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

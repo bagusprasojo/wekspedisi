@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% include "reports/_filters.html" %}
+<form class="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-4" method="get">
+    <input name="start_date" type="hidden" value="{{ start_date|date:'Y-m-d' }}">
+    <input name="end_date" type="hidden" value="{{ end_date|date:'Y-m-d' }}">
+    <div class="min-w-72">
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="account">Akun</label>
+        <select class="w-full rounded border px-3 py-2 text-sm" id="account" name="account">
+            <option value="">Semua akun</option>
+            {% for account in accounts %}
+            <option value="{{ account.pk }}" {% if selected_account.pk == account.pk %}selected{% endif %}>{{ account }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Pilih Akun</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="csv">Export CSV</button>
+</form>
+{% if selected_account %}
+<div class="mb-3 rounded border bg-white px-4 py-3 text-sm">Saldo awal: <strong>{{ opening }}</strong></div>
+{% endif %}
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">Tanggal</th>
+                <th class="px-4 py-3 font-medium">No Jurnal</th>
+                <th class="px-4 py-3 font-medium">Keterangan</th>
+                <th class="px-4 py-3 font-medium">Akun</th>
+                <th class="px-4 py-3 text-right font-medium">Debet</th>
+                <th class="px-4 py-3 text-right font-medium">Kredit</th>
+                <th class="px-4 py-3 text-right font-medium">Saldo</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+            <tr>
+                <td class="px-4 py-3">{{ row.line.journal.tanggal }}</td>
+                <td class="px-4 py-3">{{ row.line.journal.no_jurnal }}</td>
+                <td class="px-4 py-3">{{ row.line.journal.keterangan }}</td>
+                <td class="px-4 py-3">{{ row.line.perkiraan }}</td>
+                <td class="px-4 py-3 text-right">{{ row.line.debet }}</td>
+                <td class="px-4 py-3 text-right">{{ row.line.kredit }}</td>
+                <td class="px-4 py-3 text-right">{{ row.saldo|default:"" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="7">Belum ada data.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

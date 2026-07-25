@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<form class="{% if form_model_name == 'banktransaction' %}max-w-4xl{% else %}max-w-3xl{% endif %} rounded border bg-white p-5" method="post" x-data="transactionCalculator('{{ form_model_name|default:'' }}')" x-init="init()">
+    {% csrf_token %}
+    {% include 'includes/form_warnings.html' %}
+    <div class="grid {% if form_model_name == 'banktransaction' %}gap-3 md:grid-cols-4{% else %}gap-4 md:grid-cols-2{% endif %}">
+        {% for field in form.visible_fields %}
+        <label class="block text-sm {% if form_model_name == 'banktransaction' %}{% if field.name == 'debet' or field.name == 'kredit' or field.name == 'biaya_adm_bank' %}md:col-span-1{% elif field.name == 'uraian' %}md:col-span-4{% else %}md:col-span-2{% endif %}{% elif field.field.widget.input_type == 'textarea' %}md:col-span-2{% endif %}" {% if field.name == 'perkiraan_pph' %}x-show="showPph"{% elif field.name == 'bank_tujuan' or field.name == 'biaya_adm_bank' %}x-show="isBankTransfer"{% elif form_model_name == 'banktransaction' and field.name == 'kredit' %}x-show="!isBankTransfer"{% endif %}>
+            <span class="mb-1 block font-medium">{{ field.label }}</span>
+            {% if form_model_name == 'armada' and field.name == 'driver_text' %}
+                <span class="relative block" x-data="autocompleteLookup('{% url 'master_lookup_stakeholder' %}?jenis=karyawan', 'id_driver', '{{ field.value|default_if_none:''|escapejs }}')" x-init="init()">
+                <input class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" placeholder="Cari/pilih driver..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false">
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
+            {% elif form_model_name == 'cashtransaction' and field.name == 'akun_transaksi' %}
+            <span class="relative block" x-data="autocompleteLookup('{% url 'finance_transaksi_kas_account_lookup' %}', '{{ field.id_for_label }}', '')" x-init="init()">
+                <select class="absolute h-px w-px opacity-0" id="{{ field.id_for_label }}" name="{{ field.html_name }}" tabindex="-1" aria-hidden="true">
+                    <option value="">---------</option>
+                    {% for value, label in field.field.choices %}
+                    <option value="{{ value }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih akun biaya atau pendapatan..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
+            {% elif form_model_name == 'employeecashadvancepayment' and field.name == 'kas_bon_karyawan' %}
+            <select class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" x-on:change="setCashAdvanceInfo($event.target)" {% if field.field.required %}required{% endif %}>
+                <option value="">---------</option>
+                {% for advance in field.field.queryset %}
+                <option value="{{ advance.pk }}" data-nama="{{ advance.karyawan.nama|default:'' }}" data-alamat="{{ advance.karyawan.alamat|default:'' }}" data-saldo="{{ advance.display_saldo|format_money }}" {% if field.value|stringformat:'s' == advance.pk|stringformat:'s' %}selected{% endif %}>{{ advance.no_register }}</option>
+                {% endfor %}
+            </select>
+            {% elif form_model_name == 'customerinvoicepayment' and field.name == 'tagihan_customer' %}
+            <select class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" x-on:change="setInvoicePaymentInfo($event.target)" {% if field.field.required %}required{% endif %}>
+                <option value="">---------</option>
+                {% for invoice in field.field.queryset %}
+                <option value="{{ invoice.pk }}" data-nama="{{ invoice.customer.nama|default:'' }}" data-alamat="{{ invoice.customer.alamat|default:'' }}" data-nilai="{{ invoice.nilai_pekerjaan|format_money }}" data-ppn="{{ invoice.ppn|format_money }}" data-pelunasan="{{ invoice.pelunasan|format_money }}" data-saldo="{{ invoice.display_saldo|format_money }}" {% if field.value|stringformat:'s' == invoice.pk|stringformat:'s' %}selected{% endif %}>{{ invoice.no_invoice }}</option>
+                {% endfor %}
+            </select>
+            {% elif field.field.widget.attrs.lookup %}
+            <span class="space-y-2" x-data="lookupSelect()" x-init="filter($refs.select)">
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari {{ field.label|lower }}..." type="search" x-model="q" x-on:input="filter($refs.select)">
+                <select class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" x-ref="select" {% if field.field.required %}required{% endif %}>
+                    {% for value, label in field.field.choices %}
+                    <option value="{{ value }}" data-label="{{ label|escapejs }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </span>
+            {% else %}
+            {{ field }}
+            {% endif %}
+            {% if field.name == 'debet' and form_model_name == 'banktransaction' %}<span class="mt-1 block text-xs text-slate-500" x-text="isBankTransfer ? 'Nominal yang dipindahkan ke bank tujuan.' : 'Isi debet untuk transaksi keluar dari bank utama.'"></span>{% endif %}
+            {% if field.name == 'kredit' and form_model_name == 'banktransaction' %}<span class="mt-1 block text-xs text-slate-500" x-text="isBankTransfer ? 'Tidak dipakai untuk transfer antar bank.' : 'Isi kredit untuk transaksi masuk ke bank utama.'"></span>{% endif %}
+            {% if field.help_text %}<span class="mt-1 block text-xs text-slate-500">{{ field.help_text }}</span>{% endif %}
+            {% if field.errors %}<div class="mt-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{{ field.errors|join:", " }}</div>{% endif %}
+        </label>
+        {% if form_model_name == 'employeecashadvancepayment' and field.name == 'tanggal' %}
+        <div class="grid gap-3 rounded border bg-slate-50 p-3 text-sm md:col-span-2 md:grid-cols-3">
+            <div>
+                <p class="text-slate-500">Saldo Hutang</p>
+                <p class="font-semibold" x-text="cashAdvanceBalance || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Nama</p>
+                <p class="font-semibold" x-text="cashAdvanceName || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Alamat</p>
+                <p class="font-semibold" x-text="cashAdvanceAddress || '-'"></p>
+            </div>
+        </div>
+        {% elif form_model_name == 'customerinvoicepayment' and field.name == 'tanggal' %}
+        <div class="grid gap-3 rounded border bg-slate-50 p-3 text-sm md:col-span-2 md:grid-cols-3">
+            <div>
+                <p class="text-slate-500">Sisa Piutang</p>
+                <p class="font-semibold" x-text="invoicePaymentBalance || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Nama</p>
+                <p class="font-semibold" x-text="invoicePaymentName || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Alamat</p>
+                <p class="font-semibold" x-text="invoicePaymentAddress || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Nilai Pekerjaan</p>
+                <p class="font-semibold" x-text="invoicePaymentJobValue || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">PPN</p>
+                <p class="font-semibold" x-text="invoicePaymentPpn || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Pelunasan</p>
+                <p class="font-semibold" x-text="invoicePaymentPaid || '-'"></p>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    {% if form_model_name == 'customerinvoice' %}
+    <div class="mt-5 grid gap-3 rounded border bg-slate-50 p-4 text-sm md:grid-cols-3">
+        <div><p class="text-slate-500">Nilai Pekerjaan</p><p class="font-semibold" x-text="format(invoiceBase)">0,00</p></div>
+        <div><p class="text-slate-500">PPN</p><p class="font-semibold" x-text="format(invoicePpn)">0,00</p></div>
+        <div><p class="text-slate-500">Total Invoice</p><p class="font-semibold" x-text="format(invoiceTotal)">0,00</p></div>
+    </div>
+    {% elif form_model_name == 'customerinvoicepayment' %}
+    <div class="mt-5 grid gap-3 rounded border bg-slate-50 p-4 text-sm md:grid-cols-3">
+        <div><p class="text-slate-500">Nominal Kas</p><p class="font-semibold" x-text="format(paymentCash)">0,00</p></div>
+        <div><p class="text-slate-500">PPH</p><p class="font-semibold" x-text="format(paymentPph)">0,00</p></div>
+        <div><p class="text-slate-500">Total Pembayaran</p><p class="font-semibold" x-text="format(paymentTotal)">0,00</p></div>
+        <div><p class="text-slate-500">PPN Bayar</p><p class="font-semibold" x-text="format(paymentPpn)">0,00</p></div>
+    </div>
+    {% endif %}
+
+    <div class="mt-5 flex gap-2">
+        <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Simpan</button>
+        <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{{ cancel_url }}">Batal</a>
+    </div>
+</form>
+
+<script>
+function autocompleteLookup(endpoint, hiddenId, initialLabel) {
+    return {
+        term: initialLabel || '',
+        selectedLabel: initialLabel || '',
+        results: [],
+        open: false,
+        activeIndex: -1,
+        hidden: null,
+        init() {
+            this.hidden = document.getElementById(hiddenId);
+            if (!this.term && this.hidden && this.hidden.options && this.hidden.selectedIndex >= 0 && this.hidden.value) {
+                this.term = this.hidden.options[this.hidden.selectedIndex].text;
+                this.selectedLabel = this.term;
+            }
+        },
+        async search() {
+            const q = this.term.trim();
+            if (q !== this.selectedLabel && this.hidden) {
+                this.hidden.value = '';
+            }
+            if (!q) {
+                this.selectedLabel = '';
+                this.results = [];
+                this.activeIndex = -1;
+                this.open = false;
+                return;
+            }
+            const separator = endpoint.includes('?') ? '&' : '?';
+            const response = await fetch(`${endpoint}${separator}q=${encodeURIComponent(q)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await response.json();
+            this.results = data.results || [];
+            this.activeIndex = this.results.length ? 0 : -1;
+            this.open = true;
+        },
+        move(step) {
+            if (!this.open && this.results.length) this.open = true;
+            if (!this.results.length) return;
+            this.activeIndex = (this.activeIndex + step + this.results.length) % this.results.length;
+        },
+        chooseActive() {
+            if (this.activeIndex >= 0 && this.results[this.activeIndex]) {
+                this.select(this.results[this.activeIndex]);
+            }
+        },
+        select(item) {
+            this.term = item.label;
+            this.selectedLabel = item.label;
+            if (this.hidden) this.hidden.value = item.id;
+            this.results = [];
+            this.activeIndex = -1;
+            this.open = false;
+        }
+    }
+}function lookupSelect() {
+    return {
+        q: '',
+        filter(select) {
+            const term = this.q.trim().toLowerCase();
+            Array.from(select.options).forEach((option) => {
+                const label = (option.dataset.label || option.textContent || '').toLowerCase();
+                option.hidden = Boolean(term) && option.value !== '' && !label.includes(term);
+            });
+        }
+    }
+}
+function transactionCalculator(modelName) {
+    return {
+        modelName,
+        invoiceBase: 0,
+        invoicePpn: 0,
+        invoiceTotal: 0,
+        paymentCash: 0,
+        paymentPph: 0,
+        paymentTotal: 0,
+        paymentPpn: 0,
+        showPph: true,
+        isBankTransfer: false,
+        cashAdvanceName: '',
+        cashAdvanceAddress: '',
+        cashAdvanceBalance: '',
+        invoicePaymentName: '',
+        invoicePaymentAddress: '',
+        invoicePaymentBalance: '',
+        invoicePaymentJobValue: '',
+        invoicePaymentPpn: '',
+        invoicePaymentPaid: '',
+        init() {
+            this.calculate();
+            const cashAdvance = document.getElementById('id_kas_bon_karyawan');
+            if (cashAdvance) this.setCashAdvanceInfo(cashAdvance);
+            const invoicePayment = document.getElementById('id_tagihan_customer');
+            if (invoicePayment) this.setInvoicePaymentInfo(invoicePayment);
+            const fuelArmada = document.getElementById('id_armada');
+            if (this.modelName === 'fuelpurchase' && fuelArmada) {
+                fuelArmada.addEventListener('change', () => this.fillLastFuelKm(fuelArmada.value));
+            }
+            ['id_nilai_pekerjaan', 'id_ppn_persen', 'id_nominal_kas', 'id_pph_persen', 'id_pph', 'id_jenis_transaksi', 'id_debet', 'id_kredit', 'id_biaya_adm_bank', 'id_bank_utama', 'id_bank_tujuan'].forEach((id) => {
+                const input = document.getElementById(id);
+                if (input) input.addEventListener('input', () => this.calculate());
+                if (input) input.addEventListener('change', () => this.calculate());
+            });
+        },
+        value(id) {
+            const input = document.getElementById(id);
+            return input ? Number.parseFloat(input.value || '0') || 0 : 0;
+        },
+        selectedText(id) {
+            const input = document.getElementById(id);
+            return input && input.selectedOptions.length ? input.selectedOptions[0].textContent.trim() : '';
+        },
+        setValue(id, value) {
+            const input = document.getElementById(id);
+            if (input) input.value = value.toFixed(2);
+        },
+        setCashAdvanceInfo(select) {
+            const option = select.selectedOptions.length ? select.selectedOptions[0] : null;
+            this.cashAdvanceName = option ? option.dataset.nama || '' : '';
+            this.cashAdvanceAddress = option ? option.dataset.alamat || '' : '';
+            this.cashAdvanceBalance = option ? option.dataset.saldo || '' : '';
+        },
+        setInvoicePaymentInfo(select) {
+            const option = select.selectedOptions.length ? select.selectedOptions[0] : null;
+            this.invoicePaymentName = option ? option.dataset.nama || '' : '';
+            this.invoicePaymentAddress = option ? option.dataset.alamat || '' : '';
+            this.invoicePaymentBalance = option ? option.dataset.saldo || '' : '';
+            this.invoicePaymentJobValue = option ? option.dataset.nilai || '' : '';
+            this.invoicePaymentPpn = option ? option.dataset.ppn || '' : '';
+            this.invoicePaymentPaid = option ? option.dataset.pelunasan || '' : '';
+        },
+        async fillLastFuelKm(armadaId) {
+            const input = document.getElementById('id_km_terakhir');
+            if (!input || !armadaId) return;
+            const response = await fetch(`{% url 'finance_pembelian_bbm_last_km' %}?armada=${encodeURIComponent(armadaId)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await response.json();
+            input.value = data.km_terakhir || 0;
+        },
+        calculate() {
+            if (this.modelName === 'customerinvoice') {
+                this.invoiceBase = this.value('id_nilai_pekerjaan');
+                const ppnPercent = document.getElementById('id_ppn_persen') ? this.value('id_ppn_persen') : 11;
+                this.invoicePpn = this.round(this.invoiceBase * ppnPercent / 100);
+                this.invoiceTotal = this.round(this.invoiceBase + this.invoicePpn);
+            }
+            if (this.modelName === 'customerinvoicepayment') {
+                this.paymentCash = this.value('id_nominal_kas');
+                this.paymentPph = this.value('id_pph');
+                this.paymentTotal = this.round(this.paymentCash + this.paymentPph);
+                this.paymentPpn = Math.round(this.paymentTotal / 111 * 11);
+                this.showPph = this.paymentPph > 0 || this.value('id_pph_persen') > 0;
+            }
+            if (this.modelName === 'banktransaction') {
+                this.isBankTransfer = this.selectedText('id_jenis_transaksi').startsWith('20');
+            }
+        },
+        round(value) { return Math.round((value + Number.EPSILON) * 100) / 100; },
+        format(value) { return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }
+    }
+}
+</script>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+

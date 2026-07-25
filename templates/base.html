@@ -1,0 +1,140 @@
+﻿<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Wekspedisi{% endblock %}{% if request.tenant %} - {{ request.tenant.name }}{% endif %}</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div class="min-h-screen">
+        {% if request.user.is_authenticated %}
+        <header class="border-b bg-white">
+            <div class="mx-auto flex w-full max-w-[1800px] items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+                <div class="flex min-w-0 items-center gap-3">
+                    {% if request.tenant and request.tenant.logo %}
+                    <img class="h-10 w-10 shrink-0 rounded object-contain" src="{{ request.tenant.logo.url }}" alt="Logo {{ request.tenant.name }}">
+                    {% endif %}
+                    <div class="min-w-0">
+                        <p class="truncate text-sm text-slate-500">{% if request.tenant %}{{ request.tenant.name }}{% else %}Wekspedisi{% endif %}</p>
+                        <h1 class="truncate text-base font-semibold">{% block page_title %}Dashboard{% endblock %}</h1>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if request.user.is_superuser %}
+                    <a class="rounded border px-3 py-1.5 text-sm hover:bg-slate-100" href="{% url 'platform_tenant_list' %}">Platform</a>
+                    <a class="rounded border px-3 py-1.5 text-sm hover:bg-slate-100" href="{% url 'admin:index' %}">Django Admin</a>
+                    {% endif %}
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button class="rounded border px-3 py-1.5 text-sm hover:bg-slate-100" type="submit">Logout</button>
+                    </form>
+                </div>
+            </div>
+        </header>
+        {% endif %}
+        <div class="mx-auto grid w-full max-w-[1800px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:px-8">
+            {% if request.user.is_authenticated and request.tenant %}
+            <aside class="space-y-4">
+                <nav class="rounded border bg-white p-3 text-sm">
+                    <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'dashboard' %}">Dashboard</a>
+                    <div class="mt-3 border-t pt-3">
+                        <p class="px-3 py-1 text-xs font-semibold uppercase text-slate-500">Master Data</p>
+                        <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'master_customer_list' %}">Customer</a>
+                        <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'master_karyawan_list' %}">Karyawan</a>
+                        <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'master_armada_list' %}">Armada</a>
+                    </div>
+                    <div class="mt-3 border-t pt-3">
+                        <p class="px-3 py-1 text-xs font-semibold uppercase text-slate-500">Keuangan</p>
+                        <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'master_bank_list' %}">Bank/Kas</a>
+                        <div class="rounded px-3 py-2" x-data="{ open: localStorage.getItem('menu-mutasi-kas') !== 'closed' }">
+                            <button class="flex w-full items-center justify-between rounded py-1 text-left font-medium text-slate-700 hover:text-slate-900" type="button" x-on:click="open = !open; localStorage.setItem('menu-mutasi-kas', open ? 'open' : 'closed')">
+                                <span>Mutasi Kas</span>
+                                <span class="text-xs" x-text="open ? 'v' : '>'"></span>
+                            </button>
+                            <div class="mt-1 space-y-1 border-l pl-3" x-cloak x-show="open">
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'finance_transaksi_kas_list' %}">Transaksi Kas</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'finance_pembelian_bbm_list' %}">Pembelian BBM</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekap_transaksi_kas' %}">Rekap Transaksi Kas</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_riwayat_pembelian_bbm' %}">Riwayat Pembelian BBM</a>
+                            </div>
+                        </div>
+                        <div class="rounded px-3 py-2" x-data="{ open: localStorage.getItem('menu-transaksi-bank') !== 'closed' }">
+                            <button class="flex w-full items-center justify-between rounded py-1 text-left font-medium text-slate-700 hover:text-slate-900" type="button" x-on:click="open = !open; localStorage.setItem('menu-transaksi-bank', open ? 'open' : 'closed')">
+                                <span>Transaksi Bank</span>
+                                <span class="text-xs" x-text="open ? 'v' : '>'"></span>
+                            </button>
+                            <div class="mt-1 space-y-1 border-l pl-3" x-cloak x-show="open">
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'finance_transaksi_bank_list' %}">Transaksi Bank</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekening_koran' %}">Rekening Koran</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekap_transaksi_bank' %}">Rekap Transaksi</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_saldo_bank' %}">Rekap Saldo Bank</a>
+                            </div>
+                        </div>
+                        <div class="rounded px-3 py-2" x-data="{ open: localStorage.getItem('menu-kas-bon') !== 'closed' }">
+                            <button class="flex w-full items-center justify-between rounded py-1 text-left font-medium text-slate-700 hover:text-slate-900" type="button" x-on:click="open = !open; localStorage.setItem('menu-kas-bon', open ? 'open' : 'closed')">
+                                <span>Kas Bon Karyawan</span>
+                                <span class="text-xs" x-text="open ? 'v' : '>'"></span>
+                            </button>
+                            <div class="mt-1 space-y-1 border-l pl-3" x-cloak x-show="open">
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'finance_kas_bon_list' %}">Input Kas Bon</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'finance_pembayaran_kas_bon_list' %}">Pembayaran Kas Bon</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekap_transaksi_kas_bon' %}">Rekap Transaksi</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_saldo_kas_bon' %}">Rekap Saldo Kasbon</a>
+                            </div>
+                        </div>
+                        <div class="rounded px-3 py-2" x-data="{ open: localStorage.getItem('menu-invoice-customer') !== 'closed' }">
+                            <button class="flex w-full items-center justify-between rounded py-1 text-left font-medium text-slate-700 hover:text-slate-900" type="button" x-on:click="open = !open; localStorage.setItem('menu-invoice-customer', open ? 'open' : 'closed')">
+                                <span>Invoice Customer</span>
+                                <span class="text-xs" x-text="open ? 'v' : '>'"></span>
+                            </button>
+                            <div class="mt-1 space-y-1 border-l pl-3" x-cloak x-show="open">
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'invoice_invoice_customer_list' %}">Invoice Customer</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'invoice_pembayaran_invoice_list' %}">Pembayaran Invoice</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekap_invoice_customer' %}">Rekap Invoice Customer</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekap_pembayaran_invoice_customer' %}">Rekap Pembayaran Invoice Customer</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 border-t pt-3">
+                        <p class="px-3 py-1 text-xs font-semibold uppercase text-slate-500">Akuntansi</p>
+                        <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'accounting_jurnal_list' %}">Jurnal Penyesuaian</a>
+                        <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'master_akun_list' %}">Perkiraan/Akun</a>
+                        <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'accounting_closing_list' %}">Closing</a>
+                        <div class="rounded px-3 py-2" x-data="{ open: localStorage.getItem('menu-laporan-akuntansi') !== 'closed' }">
+                            <button class="flex w-full items-center justify-between rounded py-1 text-left font-medium text-slate-700 hover:text-slate-900" type="button" x-on:click="open = !open; localStorage.setItem('menu-laporan-akuntansi', open ? 'open' : 'closed')">
+                                <span>Laporan</span>
+                                <span class="text-xs" x-text="open ? 'v' : '>'"></span>
+                            </button>
+                            <div class="mt-1 space-y-1 border-l pl-3" x-cloak x-show="open">
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_daftar_jurnal' %}">Daftar Jurnal</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_buku_besar' %}">Buku Besar</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_neraca_saldo' %}">Neraca Saldo</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 border-t pt-3">
+                        <p class="px-3 py-1 text-xs font-semibold uppercase text-slate-500">Setting</p>
+                        <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'master_jenis_transaksi_list' %}">Jenis Transaksi</a>
+                        <a class="block rounded px-3 py-2 hover:bg-slate-100" href="{% url 'master_config_list' %}">Config</a>
+                    </div>
+                </nav>
+            </aside>
+            {% endif %}
+            <main class="min-w-0 {% if not request.tenant %}lg:col-span-2{% endif %}">
+                {% if messages %}
+                <div class="mb-4 space-y-2">
+                    {% for message in messages %}
+                    <div class="rounded border bg-white px-4 py-3 text-sm">{{ message }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+</body>
+</html>
+

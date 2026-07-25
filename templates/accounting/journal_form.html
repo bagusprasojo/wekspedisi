@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<form class="space-y-5" method="post" x-data="journalForm()">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ form.non_field_errors }}
+    </div>
+    {% endif %}
+    {% if formset.non_form_errors %}
+    <div class="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ formset.non_form_errors }}
+    </div>
+    {% endif %}
+
+    <div class="rounded border bg-white p-5">
+        <div class="grid gap-4 md:grid-cols-2">
+            {% for field in form %}
+            <div class="{% if field.name == 'keterangan' %}md:col-span-2{% endif %}">
+                <label class="mb-1 block text-sm font-medium text-slate-700" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<div class="mt-1 text-sm text-red-700">{{ field.errors }}</div>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="overflow-hidden rounded border bg-white">
+        {{ formset.management_form }}
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-100 text-left text-slate-600">
+                <tr>
+                    <th class="px-4 py-3 font-medium">Akun</th>
+                    <th class="w-44 px-4 py-3 font-medium">Debet</th>
+                    <th class="w-44 px-4 py-3 font-medium">Kredit</th>
+                    <th class="w-24 px-4 py-3 font-medium">Hapus</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100" x-ref="lineBody">
+                {% for line_form in formset %}
+                <tr data-row>
+                    <td class="px-4 py-3">
+                        {% for hidden in line_form.hidden_fields %}{{ hidden }}{% endfor %}
+                        <div class="relative" x-data="accountAutocomplete('{% url 'accounting_jurnal_account_lookup' %}?', '{{ line_form.perkiraan.id_for_label }}', '{{ line_form.perkiraan.value|default_if_none:'' }}', '{{ line_form.instance.perkiraan|default_if_none:''|escapejs }}')" x-init="init()">
+                            <select class="hidden" id="{{ line_form.perkiraan.id_for_label }}" name="{{ line_form.perkiraan.html_name }}" x-ref="select">
+                                {% for value, label in line_form.perkiraan.field.choices %}
+                                <option value="{{ value }}" {% if line_form.perkiraan.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari akun..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false">
+                            <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-cloak x-show="open">
+                                <template x-for="(item, index) in results" :key="item.id">
+                                    <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-bind:class="{ 'bg-slate-100': index === activeIndex }" x-text="item.label" x-on:mousedown.prevent="select(item)"></button>
+                                </template>
+                                <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0">Tidak ada akun.</div>
+                            </div>
+                        </div>
+                        {% if line_form.non_field_errors %}<div class="mt-1 text-sm text-red-700">{{ line_form.non_field_errors }}</div>{% endif %}
+                        {% if line_form.perkiraan.errors %}<div class="mt-1 text-sm text-red-700">{{ line_form.perkiraan.errors }}</div>{% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <input class="w-full rounded border px-3 py-2 text-right text-sm" id="{{ line_form.debet.id_for_label }}" name="{{ line_form.debet.html_name }}" step="0.01" type="number" value="{{ line_form.debet.value|default_if_none:'' }}" x-on:input="calculate()">
+                        {% if line_form.debet.errors %}<div class="mt-1 text-sm text-red-700">{{ line_form.debet.errors }}</div>{% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <input class="w-full rounded border px-3 py-2 text-right text-sm" id="{{ line_form.kredit.id_for_label }}" name="{{ line_form.kredit.html_name }}" step="0.01" type="number" value="{{ line_form.kredit.value|default_if_none:'' }}" x-on:input="calculate()">
+                        {% if line_form.kredit.errors %}<div class="mt-1 text-sm text-red-700">{{ line_form.kredit.errors }}</div>{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        {% if line_form.DELETE %}<div class="hidden">{{ line_form.DELETE }}</div>{% endif %}
+                        <button class="rounded border px-3 py-1.5 text-sm hover:bg-slate-100" type="button" x-on:click="removeLine($event)">Hapus</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="bg-slate-50 text-slate-700">
+                <tr>
+                    <th class="px-4 py-3 text-right font-medium">Total</th>
+                    <th class="px-4 py-3 text-right font-medium" x-text="format(totalDebet)">0</th>
+                    <th class="px-4 py-3 text-right font-medium" x-text="format(totalKredit)">0</th>
+                    <th class="px-4 py-3"></th>
+                </tr>
+            </tfoot>
+        </table>
+        <template x-ref="emptyLineTemplate">
+            <tr data-row>
+                <td class="px-4 py-3">
+                    {% for hidden in formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="relative" x-data="accountAutocomplete('{% url 'accounting_jurnal_account_lookup' %}?', '{{ formset.empty_form.perkiraan.id_for_label }}', '', '')" x-init="init()">
+                        <select class="hidden" id="{{ formset.empty_form.perkiraan.id_for_label }}" name="{{ formset.empty_form.perkiraan.html_name }}" x-ref="select">
+                            {% for value, label in formset.empty_form.perkiraan.field.choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari akun..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false">
+                        <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-cloak x-show="open">
+                            <template x-for="(item, index) in results" :key="item.id">
+                                <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-bind:class="{ 'bg-slate-100': index === activeIndex }" x-text="item.label" x-on:mousedown.prevent="select(item)"></button>
+                            </template>
+                            <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0">Tidak ada akun.</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-4 py-3">
+                    <input class="w-full rounded border px-3 py-2 text-right text-sm" id="{{ formset.empty_form.debet.id_for_label }}" name="{{ formset.empty_form.debet.html_name }}" step="0.01" type="number" x-on:input="calculate()">
+                </td>
+                <td class="px-4 py-3">
+                    <input class="w-full rounded border px-3 py-2 text-right text-sm" id="{{ formset.empty_form.kredit.id_for_label }}" name="{{ formset.empty_form.kredit.html_name }}" step="0.01" type="number" x-on:input="calculate()">
+                </td>
+                <td class="px-4 py-3 text-center">
+                    {% if formset.empty_form.DELETE %}<div class="hidden">{{ formset.empty_form.DELETE }}</div>{% endif %}
+                    <button class="rounded border px-3 py-1.5 text-sm hover:bg-slate-100" type="button" x-on:click="removeLine($event)">Hapus</button>
+                </td>
+            </tr>
+        </template>
+        <div class="border-t bg-slate-50 px-4 py-3">
+            <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" type="button" x-on:click="addLine()">Tambah Baris</button>
+        </div>
+    </div>
+
+    <div class="flex gap-2">
+        <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Simpan</button>
+        <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{{ cancel_url }}">Batal</a>
+    </div>
+</form>
+
+<script>
+function accountAutocomplete(endpoint, selectId, initialValue, initialLabel) {
+    return {
+        term: initialLabel || '',
+        selectedLabel: initialLabel || '',
+        results: [],
+        open: false,
+        activeIndex: -1,
+        selectEl: null,
+        init() {
+            this.selectEl = document.getElementById(selectId);
+            if (this.selectEl && initialValue) this.selectEl.value = initialValue;
+            if (!this.term && this.selectEl && this.selectEl.selectedOptions.length && this.selectEl.value) {
+                this.term = this.selectEl.selectedOptions[0].textContent.trim();
+                this.selectedLabel = this.term;
+            }
+        },
+        async search() {
+            const q = this.term.trim();
+            if (q !== this.selectedLabel && this.selectEl) this.selectEl.value = '';
+            if (!q) {
+                this.selectedLabel = '';
+                this.results = [];
+                this.activeIndex = -1;
+                this.open = false;
+                return;
+            }
+            const response = await fetch(`${endpoint}q=${encodeURIComponent(q)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await response.json();
+            this.results = data.results || [];
+            this.activeIndex = this.results.length ? 0 : -1;
+            this.open = true;
+        },
+        move(step) {
+            if (!this.open && this.results.length) this.open = true;
+            if (!this.results.length) return;
+            this.activeIndex = (this.activeIndex + step + this.results.length) % this.results.length;
+        },
+        chooseActive() {
+            if (this.activeIndex >= 0 && this.results[this.activeIndex]) this.select(this.results[this.activeIndex]);
+        },
+        select(item) {
+            this.term = item.label;
+            this.selectedLabel = item.label;
+            if (this.selectEl) this.selectEl.value = item.id;
+            this.results = [];
+            this.activeIndex = -1;
+            this.open = false;
+        }
+    }
+}
+
+function journalForm() {
+    return {
+        totalDebet: 0,
+        totalKredit: 0,
+        init() { this.calculate(); },
+        numberValue(input) { return Number.parseFloat(input.value || '0') || 0; },
+        calculate() {
+            const activeRows = Array.from(document.querySelectorAll('[data-row]')).filter((row) => !row.querySelector('input[name$="-DELETE"]')?.checked);
+            this.totalDebet = activeRows.reduce((sum, row) => sum + this.numberValue(row.querySelector('input[name$="-debet"]')), 0);
+            this.totalKredit = activeRows.reduce((sum, row) => sum + this.numberValue(row.querySelector('input[name$="-kredit"]')), 0);
+        },
+        format(value) { return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); },
+        addLine() {
+            const totalInput = document.querySelector('input[name="lines-TOTAL_FORMS"]');
+            const index = Number.parseInt(totalInput.value, 10);
+            const html = this.$refs.emptyLineTemplate.innerHTML.replaceAll('__prefix__', index);
+            this.$refs.lineBody.insertAdjacentHTML('beforeend', html);
+            totalInput.value = index + 1;
+            this.calculate();
+        },
+        removeLine(event) {
+            const row = event.target.closest('[data-row]');
+            const deleteInput = row.querySelector('input[name$="-DELETE"]');
+            if (deleteInput) {
+                deleteInput.checked = true;
+                row.classList.add('hidden');
+            } else {
+                row.remove();
+            }
+            this.calculate();
+        }
+    }
+}
+</script>
+{% endblock %}
+
+

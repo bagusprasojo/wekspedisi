@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% include "reports/_filters.html" %}
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">No</th>
+                <th class="px-4 py-3 font-medium">Tanggal</th>
+                <th class="px-4 py-3 font-medium">Karyawan</th>
+                <th class="px-4 py-3 font-medium">No Register</th>
+                <th class="px-4 py-3 font-medium">Akun Kas</th>
+                <th class="px-4 py-3 font-medium">Keterangan</th>
+                <th class="px-4 py-3 text-right font-medium">Keluar</th>
+                <th class="px-4 py-3 text-right font-medium">Masuk</th>
+                <th class="px-4 py-3 font-medium">Pc</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% regroup rows by account_label as grouped_rows %}
+            {% for group in grouped_rows %}
+            <tr class="bg-slate-50 font-semibold"><td class="px-4 py-2" colspan="9">{{ group.grouper }}</td></tr>
+            {% for row in group.list %}
+            <tr>
+                <td class="px-4 py-3">{{ forloop.counter }}</td>
+                <td class="px-4 py-3">{{ row.tanggal|date:"d/m/Y" }}</td>
+                <td class="px-4 py-3">{{ row.karyawan }}</td>
+                <td class="px-4 py-3">{{ row.no_register }}</td>
+                <td class="px-4 py-3">{{ row.akun_kas }}</td>
+                <td class="px-4 py-3">{{ row.keterangan }}</td>
+                <td class="px-4 py-3 text-right">{{ row.keluar|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ row.masuk|format_money }}</td>
+                <td class="px-4 py-3">{{ row.created_by }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="bg-slate-50 font-semibold">
+                <td class="px-4 py-2 text-right" colspan="6">Total {{ group.grouper }}</td>
+                <td class="px-4 py-2 text-right">{{ group.list|sum_attr:"keluar" }}</td>
+                <td class="px-4 py-2 text-right">{{ group.list|sum_attr:"masuk" }}</td>
+                <td class="px-4 py-2"></td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="9">Belum ada data.</td></tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="border-t bg-slate-100 font-semibold">
+            <tr>
+                <td class="px-4 py-3 text-right" colspan="6">Grand Total</td>
+                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"keluar" }}</td>
+                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"masuk" }}</td>
+                <td class="px-4 py-3"></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endblock %}

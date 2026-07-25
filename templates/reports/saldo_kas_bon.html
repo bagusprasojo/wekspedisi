@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<form class="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-4" method="get">
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="end_date">Periode</label>
+        <input class="rounded border px-3 py-2 text-sm" id="end_date" name="end_date" type="date" value="{{ end_date|date:'Y-m-d' }}">
+    </div>
+    <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Tampilkan</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="excel">Export Excel</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>
+</form>
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">No</th>
+                <th class="px-4 py-3 font-medium">Tanggal</th>
+                <th class="px-4 py-3 font-medium">No Register</th>
+                <th class="px-4 py-3 font-medium">Karyawan</th>
+                <th class="px-4 py-3 font-medium">Alamat</th>
+                <th class="px-4 py-3 text-right font-medium">Nominal</th>
+                <th class="px-4 py-3 text-right font-medium">Pelunasan</th>
+                <th class="px-4 py-3 text-right font-medium">Saldo</th>
+                <th class="px-4 py-3 font-medium">Pc</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% regroup rows by account_label as grouped_rows %}
+            {% for group in grouped_rows %}
+            <tr class="bg-slate-50 font-semibold"><td class="px-4 py-2" colspan="9">{{ group.grouper }}</td></tr>
+            {% for row in group.list %}
+            <tr>
+                <td class="px-4 py-3">{{ forloop.counter }}</td>
+                <td class="px-4 py-3">{{ row.tanggal|date:"d/m/Y" }}</td>
+                <td class="px-4 py-3">{{ row.no_register }}</td>
+                <td class="px-4 py-3">{{ row.nama_karyawan }}</td>
+                <td class="px-4 py-3">{{ row.alamat_karyawan }}</td>
+                <td class="px-4 py-3 text-right">{{ row.nominal|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ row.pelunasan|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ row.saldo|format_money }}</td>
+                <td class="px-4 py-3">{{ row.created_by }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="bg-slate-50 font-semibold">
+                <td class="px-4 py-2 text-right" colspan="7">Total {{ group.grouper }}</td>
+                <td class="px-4 py-2 text-right">{{ group.list|sum_attr:"saldo" }}</td>
+                <td class="px-4 py-2"></td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="9">Belum ada data.</td></tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="border-t bg-slate-100 font-semibold">
+            <tr>
+                <td class="px-4 py-3 text-right" colspan="7">Grand Total</td>
+                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"saldo" }}</td>
+                <td class="px-4 py-3"></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endblock %}

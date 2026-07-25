@@ -1,0 +1,10 @@
+<label class="block text-sm">
+    <span class="mb-1 block font-medium">{{ field.label }}</span>
+    {{ field }}
+    {% if field.help_text %}
+    <span class="mt-1 block text-xs text-slate-500">{{ field.help_text }}</span>
+    {% endif %}
+    {% if field.errors %}
+    <span class="mt-1 block text-xs text-red-600">{{ field.errors|join:", " }}</span>
+    {% endif %}
+</label>

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Wekspedisi{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="grid gap-4 md:grid-cols-3">
+    <section class="rounded border bg-white p-4">
+        <p class="text-sm text-slate-500">Tenant</p>
+        <p class="mt-1 font-medium">{{ request.tenant|default:"Belum terhubung" }}</p>
+    </section>
+    <section class="rounded border bg-white p-4">
+        <p class="text-sm text-slate-500">User</p>
+        <p class="mt-1 font-medium">{{ request.user.username }}</p>
+    </section>
+    <section class="rounded border bg-white p-4">
+        <p class="text-sm text-slate-500">Status</p>
+        <p class="mt-1 font-medium">Fondasi aplikasi siap</p>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <form class="flex flex-wrap items-end gap-2" method="get">
+        {% if date_filter_field %}
+        <label class="text-sm">
+            <span class="mb-1 block font-medium text-slate-700">Tanggal Awal</span>
+            <input class="rounded border px-3 py-2 text-sm" name="start_date" type="date" value="{{ start_date }}">
+        </label>
+        <label class="text-sm">
+            <span class="mb-1 block font-medium text-slate-700">Tanggal Akhir</span>
+            <input class="rounded border px-3 py-2 text-sm" name="end_date" type="date" value="{{ end_date }}">
+        </label>
+        {% endif %}
+        <label class="text-sm">
+            <span class="mb-1 block font-medium text-slate-700">Cari</span>
+            <input class="rounded border px-3 py-2 text-sm" name="q" placeholder="Cari..." value="{{ q|default:'' }}">
+        </label>
+        <button class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" type="submit">Tampilkan</button>
+    </form>
+    <div class="flex flex-wrap gap-2">
+        <a class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=excel">Export Excel</a>
+        <a class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=pdf">Export PDF</a>
+        <a class="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700" href="new/">Tambah</a>
+    </div>
+</div>
+<div class="overflow-x-auto rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                {% if list_headers %}{% for field, label in list_headers %}<th class="px-4 py-3 font-medium {% if field|is_money_field %}text-right{% endif %}">{{ label }}</th>{% endfor %}{% else %}{% for field in list_display %}<th class="px-4 py-3 font-medium {% if field|is_money_field %}text-right{% endif %}">{{ field|humanize_field }}</th>{% endfor %}{% endif %}
+                <th class="sticky right-0 bg-slate-100 px-4 py-3 font-medium"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for object in object_list %}
+            <tr>
+                {% for field in list_display %}<td class="whitespace-pre px-4 py-3 {% if field|is_money_field %}text-right{% endif %}">{% with value=object|get_attr:field %}{% if forloop.first and detail_url_name %}<a class="font-medium text-slate-900 hover:underline" href="{% url detail_url_name object.uuid %}">{% if field|is_money_field %}{{ value|format_money }}{% else %}{{ value }}{% endif %}</a>{% else %}{% if field|is_money_field %}{{ value|format_money }}{% else %}{{ value }}{% endif %}{% endif %}{% endwith %}</td>{% endfor %}
+                <td class="sticky right-0 bg-white px-4 py-3 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
+                    <div class="flex justify-end gap-3 whitespace-nowrap">
+                        {% if not hide_list_edit %}
+                        <a class="text-sm text-slate-700 hover:underline" href="{{ object.uuid }}/edit/">Edit</a>
+                        {% endif %}
+                        {% for action in list_actions %}
+                        <a class="text-sm text-slate-700 hover:underline" href="{% url action.url_name object.uuid %}"{% if action.target %} target="{{ action.target }}" rel="noopener"{% endif %}>{{ action.label }}</a>
+                        {% endfor %}
+                        <a class="text-sm text-red-700 hover:underline" href="{{ object.uuid }}/delete/">Hapus</a>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ list_display|length|add:1 }}">Belum ada data.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% if is_paginated %}
+<div class="mt-4 flex gap-2 text-sm">
+    {% if page_obj.has_previous %}<a class="rounded border px-3 py-2" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Sebelumnya</a>{% endif %}
+    <span class="rounded border bg-white px-3 py-2">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a class="rounded border px-3 py-2" href="?page={{ page_obj.next_page_number }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Berikutnya</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Admission Tenant{% endblock %}
+{% block page_title %}Admission Tenant{% endblock %}
+
+{% block content %}
+<form class="max-w-3xl rounded border bg-white p-5" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="grid gap-4 md:grid-cols-2">
+        <div class="md:col-span-2">
+            <h2 class="text-base font-semibold">Data Tenant</h2>
+        </div>
+        {% include "platform/partials/field.html" with field=form.name %}
+        {% include "platform/partials/field.html" with field=form.email %}
+        {% include "platform/partials/field.html" with field=form.phone %}
+        {% include "platform/partials/field.html" with field=form.city %}
+        {% include "platform/partials/field.html" with field=form.province %}
+        {% include "platform/partials/field.html" with field=form.postal_code %}
+        {% include "platform/partials/field.html" with field=form.logo %}
+        <div class="md:col-span-2">{% include "platform/partials/field.html" with field=form.address %}</div>
+        <div class="md:col-span-2 mt-2 border-t pt-4">
+            <h2 class="text-base font-semibold">Admin Tenant Pertama</h2>
+        </div>
+        {% include "platform/partials/field.html" with field=form.admin_username %}
+        {% include "platform/partials/field.html" with field=form.admin_email %}
+        {% include "platform/partials/field.html" with field=form.admin_first_name %}
+        {% include "platform/partials/field.html" with field=form.admin_last_name %}
+        {% include "platform/partials/field.html" with field=form.admin_password %}
+        {% include "platform/partials/field.html" with field=form.admin_role %}
+    </div>
+    <div class="mt-5 flex gap-2">
+        <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Simpan Admission</button>
+        <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{% url 'platform_tenant_list' %}">Batal</a>
+    </div>
+</form>
+{% endblock %}

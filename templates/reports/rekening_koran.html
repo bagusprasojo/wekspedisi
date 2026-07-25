@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<form class="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-4" method="get">
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="bank">No Rekening</label>
+        <select class="rounded border px-3 py-2 text-sm" id="bank" name="bank">
+            <option value="">---------</option>
+            {% for bank in banks %}
+            <option value="{{ bank.pk }}" {% if selected_bank.pk == bank.pk %}selected{% endif %}>{{ bank.no_rekening }} - {{ bank.nama_bank }} - {{ bank.atas_nama }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="start_date">Tanggal Awal</label>
+        <input class="rounded border px-3 py-2 text-sm" id="start_date" name="start_date" type="date" value="{{ start_date|date:'Y-m-d' }}">
+    </div>
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="end_date">Tanggal Akhir</label>
+        <input class="rounded border px-3 py-2 text-sm" id="end_date" name="end_date" type="date" value="{{ end_date|date:'Y-m-d' }}">
+    </div>
+    <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Tampilkan</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="excel">Export Excel</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>
+</form>
+
+{% if selected_bank %}
+<div class="mb-4 rounded border bg-white p-4 text-sm">
+    <div class="grid gap-3 md:grid-cols-4">
+        <div><p class="text-slate-500">No Rekening</p><p class="font-semibold">{{ selected_bank.no_rekening }}</p></div>
+        <div><p class="text-slate-500">Nama Bank</p><p class="font-semibold">{{ selected_bank.nama_bank }}</p></div>
+        <div><p class="text-slate-500">Atas Nama</p><p class="font-semibold">{{ selected_bank.atas_nama }}</p></div>
+        <div><p class="text-slate-500">Saldo Awal</p><p class="font-semibold">{{ saldo_awal|format_money }}</p></div>
+    </div>
+</div>
+{% endif %}
+
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">No</th>
+                <th class="px-4 py-3 font-medium">Tanggal</th>
+                <th class="px-4 py-3 font-medium">Kode</th>
+                <th class="px-4 py-3 text-right font-medium">Debet</th>
+                <th class="px-4 py-3 text-right font-medium">Kredit</th>
+                <th class="px-4 py-3 font-medium">Pc</th>
+                <th class="px-4 py-3 text-right font-medium">Saldo</th>
+                <th class="px-4 py-3 font-medium">Uraian</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+            <tr>
+                <td class="px-4 py-3">{{ forloop.counter }}</td>
+                <td class="px-4 py-3">{{ row.object.tanggal|date:"d/m/Y" }}</td>
+                <td class="px-4 py-3">{{ row.object.jenis_transaksi.kode }}</td>
+                <td class="px-4 py-3 text-right">{{ row.object.debet|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ row.object.kredit|format_money }}</td>
+                <td class="px-4 py-3">{{ row.object.created_by|default:"" }}</td>
+                <td class="px-4 py-3 text-right">{{ row.saldo|format_money }}</td>
+                <td class="px-4 py-3">{{ row.object.uraian }}</td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="8">{% if selected_bank %}Belum ada data.{% else %}Pilih no rekening dulu.{% endif %}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

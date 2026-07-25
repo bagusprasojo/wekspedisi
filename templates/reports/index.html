@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_daftar_jurnal' %}">
+        <p class="font-semibold">Daftar Jurnal</p>
+        <p class="mt-1 text-sm text-slate-500">Jurnal header dan detail debet/kredit.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_buku_besar' %}">
+        <p class="font-semibold">Buku Besar</p>
+        <p class="mt-1 text-sm text-slate-500">Mutasi akun dan saldo berjalan.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_neraca_saldo' %}">
+        <p class="font-semibold">Neraca Saldo</p>
+        <p class="mt-1 text-sm text-slate-500">Saldo akhir tiap perkiraan.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_saldo_bank' %}">
+        <p class="font-semibold">Saldo Bank/Kas</p>
+        <p class="mt-1 text-sm text-slate-500">Saldo bank dari akun jurnal.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_rekap_transaksi_kas' %}">
+        <p class="font-semibold">Rekap Transaksi Kas</p>
+        <p class="mt-1 text-sm text-slate-500">Rekap uang masuk dan keluar kas.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_riwayat_pembelian_bbm' %}">
+        <p class="font-semibold">Riwayat Pembelian BBM</p>
+        <p class="mt-1 text-sm text-slate-500">Riwayat BBM per armada.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_rekening_koran' %}">
+        <p class="font-semibold">Rekening Koran</p>
+        <p class="mt-1 text-sm text-slate-500">Mutasi bank per rekening.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_rekap_transaksi_bank' %}">
+        <p class="font-semibold">Rekap Transaksi Bank</p>
+        <p class="mt-1 text-sm text-slate-500">Rekap debet kredit transaksi bank.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_rekap_transaksi_kas_bon' %}">
+        <p class="font-semibold">Rekap Transaksi Kas Bon</p>
+        <p class="mt-1 text-sm text-slate-500">Kas bon dan pembayaran kas bon.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_saldo_kas_bon' %}">
+        <p class="font-semibold">Rekap Saldo Kas Bon</p>
+        <p class="mt-1 text-sm text-slate-500">Saldo kas bon belum lunas.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_rekap_invoice_customer' %}">
+        <p class="font-semibold">Rekap Invoice Customer</p>
+        <p class="mt-1 text-sm text-slate-500">Rekap invoice dan saldo tagihan customer.</p>
+    </a>
+    <a class="rounded border bg-white p-4 hover:bg-slate-50" href="{% url 'reports_rekap_pembayaran_invoice_customer' %}">
+        <p class="font-semibold">Rekap Pembayaran Invoice Customer</p>
+        <p class="mt-1 text-sm text-slate-500">Rekap penerimaan invoice customer.</p>
+    </a>
+</div>
+{% endblock %}

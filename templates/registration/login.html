@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Wekspedisi{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-sm rounded border bg-white p-6 shadow-sm">
+    <h1 class="text-lg font-semibold">Login</h1>
+    <form class="mt-5 space-y-4" method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div>
+            <label class="mb-1 block text-sm font-medium" for="id_username">Username</label>
+            <input class="w-full rounded border px-3 py-2" id="id_username" name="username" type="text" required autofocus>
+        </div>
+        <div>
+            <label class="mb-1 block text-sm font-medium" for="id_password">Password</label>
+            <input class="w-full rounded border px-3 py-2" id="id_password" name="password" type="password" required>
+        </div>
+        <button class="w-full rounded bg-slate-900 px-4 py-2 text-white hover:bg-slate-700" type="submit">Masuk</button>
+    </form>
+</div>
+{% endblock %}

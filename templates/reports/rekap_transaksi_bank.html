@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% include "reports/_filters.html" %}
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">No</th>
+                <th class="px-4 py-3 font-medium">Tanggal</th>
+                <th class="px-4 py-3 font-medium">Bank & Keterangan</th>
+                <th class="px-4 py-3 text-right font-medium">Debet</th>
+                <th class="px-4 py-3 text-right font-medium">Kredit</th>
+                <th class="px-4 py-3 font-medium">Pc</th>
+                <th class="px-4 py-3 font-medium">Kode</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+            <tr>
+                <td class="px-4 py-3">{{ forloop.counter }}</td>
+                <td class="px-4 py-3">{{ row.tanggal|date:"d/m/Y" }}</td>
+                <td class="px-4 py-3">{{ row.bank_utama.nama_bank }},{{ row.bank_utama.no_rekening }},{{ row.uraian }}</td>
+                <td class="px-4 py-3 text-right">{{ row.debet|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ row.kredit|format_money }}</td>
+                <td class="px-4 py-3">{{ row.created_by|default:"" }}</td>
+                <td class="px-4 py-3">{{ row.jenis_transaksi.kode }}</td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="7">Belum ada data.</td></tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="border-t bg-slate-50 font-semibold">
+            <tr>
+                <td class="px-4 py-3 text-right" colspan="3">Grand Total</td>
+                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"debet" }}</td>
+                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"kredit" }}</td>
+                <td class="px-4 py-3" colspan="2"></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endblock %}

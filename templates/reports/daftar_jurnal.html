@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% include "reports/_filters.html" %}
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">Tanggal</th>
+                <th class="px-4 py-3 font-medium">No Jurnal</th>
+                <th class="px-4 py-3 font-medium">Jenis Transaksi</th>
+                <th class="px-4 py-3 font-medium">Keterangan</th>
+                <th class="px-4 py-3 text-right font-medium">Total Debet</th>
+                <th class="px-4 py-3 text-right font-medium">Total Kredit</th>
+                <th class="px-4 py-3 font-medium"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for journal in journals %}
+            <tr>
+                <td class="px-4 py-3">{{ journal.tanggal }}</td>
+                <td class="px-4 py-3">{{ journal.no_jurnal }}</td>
+                <td class="px-4 py-3">{{ journal.transaksi }}</td>
+                <td class="px-4 py-3">{{ journal.keterangan }}</td>
+                <td class="px-4 py-3 text-right">{{ journal.total_debet|default:0|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ journal.total_kredit|default:0|format_money }}</td>
+                <td class="px-4 py-3 text-right"><a class="text-sm text-slate-700 hover:underline" href="{% url 'reports_daftar_jurnal_detail' journal.uuid %}">Detail</a></td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="7">Belum ada data.</td></tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="border-t bg-slate-50 font-semibold">
+            <tr>
+                <td class="px-4 py-3 text-right" colspan="4">Total</td>
+                <td class="px-4 py-3 text-right">{{ total_debet|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ total_kredit|format_money }}</td>
+                <td class="px-4 py-3"></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% if is_paginated %}
+<div class="mt-4 flex flex-wrap items-center gap-2 text-sm">
+    {% if page_obj.has_previous %}<a class="rounded border px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.previous_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Sebelumnya</a>{% endif %}
+    <span class="rounded border bg-white px-3 py-2">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a class="rounded border px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.next_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Berikutnya</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

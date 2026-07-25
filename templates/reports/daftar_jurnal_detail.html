@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="mb-4 rounded border bg-white p-4 text-sm">
+    <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div><p class="text-slate-500">Tanggal</p><p class="font-semibold">{{ journal.tanggal }}</p></div>
+        <div><p class="text-slate-500">No Jurnal</p><p class="font-semibold">{{ journal.no_jurnal }}</p></div>
+        <div><p class="text-slate-500">Jenis Transaksi</p><p class="font-semibold">{{ journal.transaksi }}</p></div>
+        <div><p class="text-slate-500">Keterangan</p><p class="font-semibold">{{ journal.keterangan|default:"-" }}</p></div>
+    </div>
+</div>
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">Kode Akun</th>
+                <th class="px-4 py-3 font-medium">Akun</th>
+                <th class="px-4 py-3 text-right font-medium">Debet</th>
+                <th class="px-4 py-3 text-right font-medium">Kredit</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for line in journal.lines.all %}
+            <tr>
+                <td class="px-4 py-3">{{ line.perkiraan.kode }}</td>
+                <td class="px-4 py-3">{{ line.perkiraan.nama }}</td>
+                <td class="px-4 py-3 text-right">{{ line.debet|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ line.kredit|format_money }}</td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="4">Belum ada detail jurnal.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<div class="mt-4">
+    <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{% url 'reports_daftar_jurnal' %}">Kembali</a>
+</div>
+{% endblock %}

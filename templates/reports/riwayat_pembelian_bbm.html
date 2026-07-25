@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<form class="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-4" method="get">
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="armada">No Polisi</label>
+        <select class="rounded border px-3 py-2 text-sm" id="armada" name="armada">
+            <option value="">---------</option>
+            {% for armada in armadas %}
+            <option value="{{ armada.pk }}" {% if selected_armada.pk == armada.pk %}selected{% endif %}>{{ armada.nopol }} - {{ armada.kendaraan }}{% if armada.pemilik %} - {{ armada.pemilik }}{% endif %}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="start_date">Tanggal Awal</label>
+        <input class="rounded border px-3 py-2 text-sm" id="start_date" name="start_date" type="date" value="{{ start_date|date:'Y-m-d' }}">
+    </div>
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="end_date">Tanggal Akhir</label>
+        <input class="rounded border px-3 py-2 text-sm" id="end_date" name="end_date" type="date" value="{{ end_date|date:'Y-m-d' }}">
+    </div>
+    <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Tampilkan</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="excel">Export Excel</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>
+</form>
+
+{% if selected_armada %}
+<div class="mb-4 rounded border bg-white p-4 text-sm">
+    <div class="grid gap-3 md:grid-cols-3">
+        <div><p class="text-slate-500">No. Polisi</p><p class="font-semibold">{{ selected_armada.nopol }}</p></div>
+        <div><p class="text-slate-500">Kendaraan</p><p class="font-semibold">{{ selected_armada.kendaraan }}</p></div>
+        <div><p class="text-slate-500">Driver</p><p class="font-semibold">{{ selected_armada.driver.nama|default:"-" }}</p></div>
+    </div>
+</div>
+{% endif %}
+
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">No</th>
+                <th class="px-4 py-3 font-medium">Tanggal</th>
+                <th class="px-4 py-3 font-medium">Keterangan</th>
+                <th class="px-4 py-3 text-right font-medium">KM Terakhir</th>
+                <th class="px-4 py-3 text-right font-medium">KM Sekarang</th>
+                <th class="px-4 py-3 text-right font-medium">Jarak Tempuh</th>
+                <th class="px-4 py-3 text-right font-medium">Pengisian</th>
+                <th class="px-4 py-3 font-medium">Pc</th>
+                <th class="px-4 py-3 font-medium">Driver</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+            <tr>
+                <td class="px-4 py-3">{{ forloop.counter }}</td>
+                <td class="px-4 py-3">{{ row.tanggal|date:"d/m/Y" }}</td>
+                <td class="px-4 py-3">{{ row.keterangan }}</td>
+                <td class="px-4 py-3 text-right">{{ row.km_terakhir }}</td>
+                <td class="px-4 py-3 text-right">{{ row.km_sekarang }}</td>
+                <td class="px-4 py-3 text-right">{{ row.jarak_tempuh }}</td>
+                <td class="px-4 py-3 text-right">{{ row.nominal_bbm|format_money }}</td>
+                <td class="px-4 py-3">{{ row.created_by|default:"" }}</td>
+                <td class="px-4 py-3">{{ row.driver.nama|default:"" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="9">{% if selected_armada %}Belum ada data.{% else %}Pilih no polisi dulu.{% endif %}</td></tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="border-t bg-slate-50 font-semibold">
+            <tr>
+                <td class="px-4 py-3 text-right" colspan="6">Total</td>
+                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"nominal_bbm" }}</td>
+                <td class="px-4 py-3" colspan="2"></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endblock %}

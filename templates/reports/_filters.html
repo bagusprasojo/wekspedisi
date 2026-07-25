@@ -1,0 +1,18 @@
+<form class="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-4" method="get">
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="start_date">Tanggal Awal</label>
+        <input class="rounded border px-3 py-2 text-sm" id="start_date" name="start_date" type="date" value="{{ start_date|date:'Y-m-d' }}">
+    </div>
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="end_date">Tanggal Akhir</label>
+        <input class="rounded border px-3 py-2 text-sm" id="end_date" name="end_date" type="date" value="{{ end_date|date:'Y-m-d' }}">
+    </div>
+    {% block extra_filters %}{% endblock %}
+    <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Tampilkan</button>
+    {% if export_excel_pdf %}
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="excel">Export Excel</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>
+    {% else %}
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="csv">Export CSV</button>
+    {% endif %}
+</form>
