@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load crud_extras %}
 
 {% block title %}{{ title }}{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
@@ -54,7 +55,9 @@
 
     <div class="flex gap-2">
         <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{{ cancel_url }}">Kembali</a>
+        {% if not object|is_closed_transaction %}
         <a class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" href="{% url 'finance_kas_bon_update' object.uuid %}">Edit</a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

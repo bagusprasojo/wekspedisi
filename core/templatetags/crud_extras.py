@@ -77,3 +77,14 @@ def sum_attr(items, attr_name):
         except Exception:
             continue
     return format_money(total)
+
+@register.filter
+def is_closed_transaction(obj):
+    if getattr(getattr(obj, '_meta', None), 'app_label', None) not in {'finance', 'invoice'}:
+        return False
+    tenant = getattr(obj, 'tenant', None)
+    tanggal = getattr(obj, 'tanggal', None)
+    if not tenant or not tanggal:
+        return False
+    from accounting.models import ClosingPeriod
+    return ClosingPeriod.objects.filter(tenant=tenant, is_deleted=False, tanggal__gte=tanggal).exists()

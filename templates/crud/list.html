@@ -42,15 +42,19 @@
             <tr>
                 {% for field in list_display %}<td class="whitespace-pre px-4 py-3 {% if field|is_money_field %}text-right{% endif %}">{% with value=object|get_attr:field %}{% if forloop.first and detail_url_name %}<a class="font-medium text-slate-900 hover:underline" href="{% url detail_url_name object.uuid %}">{% if field|is_money_field %}{{ value|format_money }}{% else %}{{ value }}{% endif %}</a>{% else %}{% if field|is_money_field %}{{ value|format_money }}{% else %}{{ value }}{% endif %}{% endif %}{% endwith %}</td>{% endfor %}
                 <td class="sticky right-0 bg-white px-4 py-3 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
+                    {% with is_closed=object|is_closed_transaction %}
                     <div class="flex justify-end gap-3 whitespace-nowrap">
-                        {% if not hide_list_edit %}
+                        {% if not hide_list_edit and not is_closed %}
                         <a class="text-sm text-slate-700 hover:underline" href="{{ object.uuid }}/edit/">Edit</a>
                         {% endif %}
                         {% for action in list_actions %}
                         <a class="text-sm text-slate-700 hover:underline" href="{% url action.url_name object.uuid %}"{% if action.target %} target="{{ action.target }}" rel="noopener"{% endif %}>{{ action.label }}</a>
                         {% endfor %}
+                        {% if not is_closed %}
                         <a class="text-sm text-red-700 hover:underline" href="{{ object.uuid }}/delete/">Hapus</a>
+                        {% endif %}
                     </div>
+                    {% endwith %}
                 </td>
             </tr>
             {% empty %}

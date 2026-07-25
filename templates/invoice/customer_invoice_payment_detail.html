@@ -66,7 +66,9 @@
     <div class="flex gap-2">
         <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{{ cancel_url }}">Kembali</a>
         <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{% url 'invoice_pembayaran_invoice_receipt' object.uuid %}" target="_blank" rel="noopener">Kwitansi</a>
+        {% if not object|is_closed_transaction %}
         <a class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" href="{% url 'invoice_pembayaran_invoice_update' object.uuid %}">Edit</a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

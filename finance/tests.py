@@ -5,10 +5,10 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from accounting.models import Journal
+from accounting.models import ClosingPeriod, Journal
 from accounting.services import generated_transaction_key
 from accounts.models import UserProfile
-from finance.models import BankTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase
+from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase
 from master.models import Armada, BankAccount, ChartOfAccount, StakeHolder, TransactionType
 from tenants.models import Tenant
 
@@ -260,3 +260,47 @@ class CashTransactionAccountLookupTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'results': [{'id': leaf.pk, 'label': str(leaf)}]})
+
+class TransactionClosingActionVisibilityTests(TestCase):
+    def test_cash_transaction_list_hides_edit_and_closed_delete_actions(self):
+        tenant = Tenant.objects.create(name='CV Test')
+        user = get_user_model().objects.create_user(username='admin', password='secret')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        cash_account = ChartOfAccount.objects.create(
+            tenant=tenant,
+            kode='101',
+            nama='Kas',
+            saldo_normal=ChartOfAccount.NormalBalance.DEBET,
+        )
+        expense_account = ChartOfAccount.objects.create(
+            tenant=tenant,
+            kode='601',
+            nama='Biaya Operasional',
+            saldo_normal=ChartOfAccount.NormalBalance.DEBET,
+        )
+        bank = BankAccount.objects.create(
+            tenant=tenant,
+            no_rekening='001',
+            nama_bank='Kas',
+            atas_nama='CV Test',
+            akun=cash_account,
+        )
+        transaction = CashTransaction.objects.create(
+            tenant=tenant,
+            no_bukti='KAS-1',
+            tanggal=date(2026, 7, 15),
+            akun_kas=cash_account,
+            akun_transaksi=expense_account,
+            bank=bank,
+            nominal_keluar=Decimal('1000'),
+        )
+        ClosingPeriod.objects.create(tenant=tenant, tanggal=date(2026, 7, 31))
+
+        self.client.login(username='admin', password='secret')
+        response = self.client.get('/finance/transaksi-kas/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, f'{transaction.uuid}/edit/')
+        self.assertNotContains(response, f'{transaction.uuid}/delete/')
+        self.assertNotContains(response, '>Edit<')
+        self.assertNotContains(response, '>Hapus<')
