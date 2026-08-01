@@ -10,7 +10,9 @@ from core.services import next_invoice_number
 
 
 ZERO = Decimal('0')
-LEGACY_PPN_PERCENT = Decimal('11')
+LEGACY_PPN_PERCENT = Decimal('12')
+LEGACY_PPN_RATE = Decimal('11')
+REQUIRED_INVOICE_CONFIGS = ['INVOICE_CODE', 'INVOICE_ADMIN_NAME', 'INVOICE_PAYMENT_TEXT']
 SATUAN = [
     '', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas',
 ]
@@ -36,6 +38,17 @@ def terbilang(angka):
     if angka < 1000000000000:
         return f'{terbilang(angka // 1000000000)} Miliar {terbilang(angka % 1000000000)}'
     return 'Angka terlalu besar'
+
+def require_invoice_configs(tenant):
+    from master.services import get_config_value
+
+    missing = [kode for kode in REQUIRED_INVOICE_CONFIGS if not get_config_value(tenant, kode, required=False)]
+    if missing:
+        raise ValidationError(
+            'Konfigurasi invoice belum lengkap. Isi Config tenant: '
+            + ', '.join(missing)
+            + '.'
+        )
 
 
 class CustomerInvoice(TenantScopedModel):
@@ -73,6 +86,7 @@ class CustomerInvoice(TenantScopedModel):
         from master.services import get_config_account
         old = type(self).objects.filter(pk=self.pk).first() if self.pk else None
         ensure_open_period(self.tenant, self.tanggal, old.tanggal if old else None)
+        require_invoice_configs(self.tenant)
         if old and old.pelunasan > ZERO:
             raise ValidationError('Invoice tidak bisa diubah karena sudah ada pembayaran.')
         if not self.customer:
@@ -85,7 +99,7 @@ class CustomerInvoice(TenantScopedModel):
         self.perkiraan_piutang = get_config_account(self.tenant, 'PIUTANG_JASA_ID')
         if not self.no_invoice:
             self.no_invoice = next_invoice_number(self.tenant, self.tanggal)
-        self.ppn = (self.nilai_pekerjaan * self.ppn_persen / Decimal('100')).quantize(Decimal('0.01'))
+        self.ppn = (self.nilai_pekerjaan * LEGACY_PPN_RATE / Decimal('100')).quantize(Decimal('0.01'))
         if self.ppn <= ZERO:
             raise ValidationError('Nilai PPN belum diisi.')
         self.total = self.nilai_pekerjaan + self.ppn

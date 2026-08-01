@@ -1,10 +1,10 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db.models import Sum
 
-from accounting.models import Journal, JournalLine
+from accounting.models import ClosingBankBalance, Journal, JournalLine
 from accounting.services import normal_balance_amount
 from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase
 from invoice.models import CustomerInvoice, CustomerInvoicePayment
@@ -156,26 +156,65 @@ def rekap_transaksi_bank(tenant, start_date=None, end_date=None):
     return queryset.order_by('jenis_transaksi__akun__kode', 'tanggal', 'id')
 
 def rekening_koran(tenant, start_date=None, end_date=None, bank=None):
-    if not bank:
-        return BankTransaction.objects.none()
-    queryset = BankTransaction.objects.filter(tenant=tenant, is_deleted=False, bank_utama=bank).select_related(
-        'jenis_transaksi',
-        'bank_utama',
-        'created_by',
-    )
-    queryset = filter_date_range(queryset, start_date, end_date)
-    return queryset.order_by('tanggal', 'id')
+    rows = bank_mutasi_rows(tenant, bank, start_date, end_date)
+    return sorted(rows, key=lambda row: (row['tanggal'], row['order'], row['id']))
 
 def rekening_koran_saldo_awal(tenant, start_date=None, bank=None):
     if not bank or not start_date:
         return ZERO
-    totals = BankTransaction.objects.filter(
+    cutoff = start_date - timedelta(days=1)
+    closing = ClosingBankBalance.objects.filter(
         tenant=tenant,
         is_deleted=False,
-        bank_utama=bank,
-        tanggal__lt=start_date,
-    ).aggregate(total_debet=Sum('debet'), total_kredit=Sum('kredit'))
-    return (totals['total_kredit'] or ZERO) - (totals['total_debet'] or ZERO)
+        bank=bank,
+        tanggal__lte=cutoff,
+    ).order_by('-tanggal').first()
+    saldo = closing.saldo_akhir if closing else ZERO
+    after_closing = closing.tanggal + timedelta(days=1) if closing else None
+    for row in bank_mutasi_rows(tenant, bank, after_closing, cutoff):
+        saldo += row['kredit'] - row['debet']
+    return saldo
+
+def bank_mutasi_rows(tenant, bank, start_date=None, end_date=None):
+    if not bank:
+        return []
+
+    def in_range(queryset):
+        return filter_date_range(queryset, start_date, end_date)
+
+    def username(obj):
+        return obj.created_by.username if obj.created_by else ''
+
+    rows = []
+    for row in in_range(BankTransaction.objects.filter(tenant=tenant, is_deleted=False, bank_utama=bank).select_related('jenis_transaksi', 'created_by')):
+        rows.append({'id': row.id, 'order': 10, 'tanggal': row.tanggal, 'kode': row.jenis_transaksi.kode, 'debet': row.debet, 'kredit': row.kredit, 'user_create': username(row), 'uraian': row.uraian})
+        if row.biaya_adm_bank > ZERO:
+            rows.append({'id': row.id, 'order': 40, 'tanggal': row.tanggal, 'kode': '08', 'debet': row.biaya_adm_bank, 'kredit': ZERO, 'user_create': username(row), 'uraian': 'Biaya administrasi bank'})
+
+    for row in in_range(BankTransaction.objects.filter(tenant=tenant, is_deleted=False, bank_tujuan=bank).select_related('jenis_transaksi', 'created_by')):
+        rows.append({'id': row.id, 'order': 50, 'tanggal': row.tanggal, 'kode': row.jenis_transaksi.kode, 'debet': row.kredit, 'kredit': row.debet, 'user_create': username(row), 'uraian': row.uraian})
+
+    for row in in_range(CustomerInvoicePayment.objects.filter(tenant=tenant, is_deleted=False, bank=bank).select_related('tagihan_customer__customer', 'created_by')):
+        invoice = row.tagihan_customer
+        customer = invoice.customer
+        suffix = f'{invoice.no_invoice}a.n. {customer.nama}'
+        rows.append({'id': row.id, 'order': 20, 'tanggal': row.tanggal, 'kode': '00', 'debet': ZERO, 'kredit': row.nominal_kas + row.pph - row.ppn, 'user_create': username(row), 'uraian': f'Pembayaran Invoice {suffix}'})
+        rows.append({'id': row.id, 'order': 21, 'tanggal': row.tanggal, 'kode': '00', 'debet': ZERO, 'kredit': row.ppn, 'user_create': username(row), 'uraian': f'Pembayaran PPN Invoice {suffix}'})
+        rows.append({'id': row.id, 'order': 22, 'tanggal': row.tanggal, 'kode': '00', 'debet': row.pph, 'kredit': ZERO, 'user_create': username(row), 'uraian': f'Pembayaran PPH Invoice {suffix}'})
+
+    for row in in_range(CashTransaction.objects.filter(tenant=tenant, is_deleted=False, bank=bank).select_related('akun_transaksi', 'created_by')):
+        rows.append({'id': row.id, 'order': 60, 'tanggal': row.tanggal, 'kode': '00', 'debet': row.nominal_keluar, 'kredit': row.nominal_masuk, 'user_create': username(row), 'uraian': f'{row.akun_transaksi.nama} [Via Mutasi Kas]'})
+
+    for row in in_range(EmployeeCashAdvancePayment.objects.filter(tenant=tenant, is_deleted=False, bank=bank).select_related('created_by')):
+        rows.append({'id': row.id, 'order': 70, 'tanggal': row.tanggal, 'kode': '00', 'debet': ZERO, 'kredit': row.nominal, 'user_create': username(row), 'uraian': f'{row.keterangan} [Via Pembayaran Kas Bon]'})
+
+    for row in in_range(EmployeeCashAdvance.objects.filter(tenant=tenant, is_deleted=False, bank=bank).select_related('karyawan', 'created_by')):
+        rows.append({'id': row.id, 'order': 80, 'tanggal': row.tanggal, 'kode': '00', 'debet': row.nominal, 'kredit': ZERO, 'user_create': username(row), 'uraian': f'Kas Bon a.n. {row.karyawan.nama} [Via Kas Bon]'})
+
+    for row in in_range(FuelPurchase.objects.filter(tenant=tenant, is_deleted=False, bank=bank).select_related('created_by')):
+        rows.append({'id': row.id, 'order': 90, 'tanggal': row.tanggal, 'kode': '00', 'debet': row.nominal_bbm, 'kredit': ZERO, 'user_create': username(row), 'uraian': f'{row.keterangan} [Via Transaksi Pembelian BBM]'})
+
+    return rows
 
 def rekap_transaksi_kas_bon(tenant, start_date=None, end_date=None):
     rows = []

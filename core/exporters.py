@@ -1,12 +1,13 @@
 import base64
 import os
-import struct
-import zlib
 from decimal import Decimal
 from html import escape
 from io import BytesIO
 
 from django.http import HttpResponse
+from django.utils import timezone
+
+_DLL_DIR_HANDLES = []
 
 def _tenant_logo_path(tenant):
     logo = getattr(tenant, 'logo', None)
@@ -27,241 +28,8 @@ def _tenant_logo_data_uri(tenant):
         data = base64.b64encode(image_file.read()).decode('ascii')
     return f'data:{mime};base64,{data}'
 
-def _png_rgb_data(path):
-    with open(path, 'rb') as image_file:
-        data = image_file.read()
-    if not data.startswith(b'\x89PNG\r\n\x1a\n'):
-        return None
-    pos = 8
-    width = height = color_type = None
-    compressed = b''
-    while pos < len(data):
-        length = int.from_bytes(data[pos:pos + 4], 'big')
-        chunk_type = data[pos + 4:pos + 8]
-        chunk_data = data[pos + 8:pos + 8 + length]
-        pos += 12 + length
-        if chunk_type == b'IHDR':
-            width, height, bit_depth, color_type, _, _, _ = struct.unpack('>IIBBBBB', chunk_data)
-            if bit_depth != 8 or color_type not in (2, 6):
-                return None
-        elif chunk_type == b'IDAT':
-            compressed += chunk_data
-        elif chunk_type == b'IEND':
-            break
-    if not width or not height or not compressed:
-        return None
-    channels = 4 if color_type == 6 else 3
-    stride = width * channels
-    raw = zlib.decompress(compressed)
-    rows = []
-    prev = bytearray(stride)
-    offset = 0
-    for _ in range(height):
-        filter_type = raw[offset]
-        offset += 1
-        row = bytearray(raw[offset:offset + stride])
-        offset += stride
-        for i in range(stride):
-            left = row[i - channels] if i >= channels else 0
-            up = prev[i]
-            up_left = prev[i - channels] if i >= channels else 0
-            if filter_type == 1:
-                row[i] = (row[i] + left) & 0xFF
-            elif filter_type == 2:
-                row[i] = (row[i] + up) & 0xFF
-            elif filter_type == 3:
-                row[i] = (row[i] + ((left + up) // 2)) & 0xFF
-            elif filter_type == 4:
-                p = left + up - up_left
-                pa = abs(p - left)
-                pb = abs(p - up)
-                pc = abs(p - up_left)
-                row[i] = (row[i] + (left if pa <= pb and pa <= pc else up if pb <= pc else up_left)) & 0xFF
-        prev = row
-        if channels == 3:
-            rows.append(bytes(row))
-        else:
-            rgb = bytearray()
-            for i in range(0, len(row), 4):
-                alpha = row[i + 3] / 255
-                rgb.extend(int(row[i + channel] * alpha + 255 * (1 - alpha)) for channel in range(3))
-            rows.append(bytes(rgb))
-    return width, height, b''.join(rows)
-
-def _jpeg_size(path):
-    with open(path, 'rb') as image_file:
-        data = image_file.read()
-    index = 2
-    while index < len(data) - 9:
-        if data[index] != 0xFF:
-            index += 1
-            continue
-        marker = data[index + 1]
-        index += 2
-        if marker in (0xC0, 0xC1, 0xC2):
-            height = int.from_bytes(data[index + 3:index + 5], 'big')
-            width = int.from_bytes(data[index + 5:index + 7], 'big')
-            return width, height, data
-        length = int.from_bytes(data[index:index + 2], 'big')
-        index += length
-    return None, None, data
-
 def _text(value):
-    if value is None:
-        return ''
-    return str(value)
-
-def excel_response(filename, title, headers, rows, tenant=None):
-    logo = _tenant_logo_data_uri(tenant)
-    html = [
-        '<html><head><meta charset="utf-8">',
-        '<style>body{font-family:Arial,sans-serif} table{border-collapse:collapse} th{background:#e5e7eb;font-weight:bold} th,td{border:1px solid #94a3b8;padding:6px} .num{text-align:right}</style>',
-        '</head><body>',
-    ]
-    if logo:
-        html.append(f'<img src="{logo}" style="height:56px;max-width:120px">')
-    html.extend([f'<h2>{escape(title)}</h2>', '<table><thead><tr>'])
-    for header in headers:
-        html.append(f'<th>{escape(_text(header))}</th>')
-    html.append('</tr></thead><tbody>')
-    for row in rows:
-        html.append('<tr>')
-        for value in row:
-            css = ' class="num"' if isinstance(value, (int, float, Decimal)) else ''
-            html.append(f'<td{css}>{escape(_text(value))}</td>')
-        html.append('</tr>')
-    html.append('</tbody></table></body></html>')
-    response = HttpResponse(''.join(html), content_type='application/vnd.ms-excel; charset=utf-8')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
-
-def _pdf_escape(value):
-    return _text(value).replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
-
-def _pdf_stream(lines):
-    return ('\n'.join(lines)).encode('latin-1', errors='replace')
-
-def _pdf_object(number, body):
-    if isinstance(body, bytes):
-        return f'{number} 0 obj\n'.encode('latin-1') + body + b'\nendobj\n'
-    return f'{number} 0 obj\n{body}\nendobj\n'.encode('latin-1', errors='replace')
-
-def _pdf_logo_object(tenant, number):
-    path = _tenant_logo_path(tenant)
-    if not path:
-        return None, None
-    try:
-        if path.lower().endswith('.png'):
-            png_data = _png_rgb_data(path)
-            if not png_data:
-                return None, None
-            width, height, data = png_data
-            compressed = zlib.compress(data)
-            body = (
-                f'<< /Type /XObject /Subtype /Image /Width {width} /Height {height} '
-                f'/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length {len(compressed)} >>\nstream\n'
-            ).encode('latin-1') + compressed + b'\nendstream'
-        else:
-            width, height, data = _jpeg_size(path)
-            if not width or not height:
-                return None, None
-            body = (
-                f'<< /Type /XObject /Subtype /Image /Width {width} /Height {height} '
-                f'/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {len(data)} >>\nstream\n'
-            ).encode('latin-1') + data + b'\nendstream'
-    except Exception:
-        return None, None
-    return _pdf_object(number, body), {'number': number, 'width': width, 'height': height}
-
-def _pdf_draw_logo(meta, x, y, max_w=55, max_h=55):
-    if not meta:
-        return ''
-    scale = min(max_w / meta['width'], max_h / meta['height'])
-    width = meta['width'] * scale
-    height = meta['height'] * scale
-    return f'q {width:.2f} 0 0 {height:.2f} {x:.2f} {y:.2f} cm /Logo Do Q'
-
-def pdf_response(filename, title, headers, rows, landscape=True, tenant=None):
-    width, height = (842, 595) if landscape else (595, 842)
-    margin = 28
-    font_size = 8
-    title_size = 14
-    line_height = 16
-    table_width = width - (margin * 2)
-    col_width = table_width / max(len(headers), 1)
-    rows_per_page = max(int((height - 115) / line_height), 1)
-    chunks = [rows[i:i + rows_per_page] for i in range(0, len(rows), rows_per_page)] or [[]]
-
-    objects = []
-    page_numbers = []
-    content_numbers = []
-    logo_object, logo_meta = _pdf_logo_object(tenant, 3)
-    next_number = 4 if logo_object else 3
-
-    for page_index, chunk in enumerate(chunks, start=1):
-        page_no = next_number
-        content_no = next_number + 1
-        next_number += 2
-        page_numbers.append(page_no)
-        content_numbers.append(content_no)
-        y = height - margin
-        lines = [
-            'BT',
-            f'/F1 {title_size} Tf {margin} {y} Td ({_pdf_escape(title)}) Tj',
-            'ET',
-        ]
-        logo_cmd = _pdf_draw_logo(logo_meta, margin, y - 60, max_w=50, max_h=50)
-        if logo_cmd:
-            lines.append(logo_cmd)
-        y -= 26
-        lines.extend(['BT', f'/F1 {font_size} Tf'])
-        x = margin
-        for header in headers:
-            lines.append(f'1 0 0 1 {x + 2:.2f} {y:.2f} Tm ({_pdf_escape(_text(header)[:22])}) Tj')
-            x += col_width
-        lines.append('ET')
-        y -= line_height
-        for row in chunk:
-            lines.extend(['BT', f'/F1 {font_size} Tf'])
-            x = margin
-            for value in row:
-                value_text = _text(value).replace('\r', ' ').replace('\n', ' ')
-                max_chars = max(int(col_width / 4.1), 6)
-                if len(value_text) > max_chars:
-                    value_text = value_text[:max_chars - 1] + '…'
-                lines.append(f'1 0 0 1 {x + 2:.2f} {y:.2f} Tm ({_pdf_escape(value_text)}) Tj')
-                x += col_width
-            lines.append('ET')
-            y -= line_height
-        lines.extend(['BT', f'/F1 8 Tf {width - margin - 70} {margin / 2:.2f} Td (Halaman {page_index}) Tj', 'ET'])
-        content = _pdf_stream(lines)
-        objects.append((content_no, _pdf_object(content_no, f'<< /Length {len(content)} >>\nstream\n' + content.decode('latin-1') + '\nendstream')))
-        xobjects = f'/XObject << /Logo {logo_meta["number"]} 0 R >> ' if logo_meta else ''
-        objects.append((page_no, _pdf_object(page_no, f'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] /Resources << /Font << /F1 1 0 R >> {xobjects}>> /Contents {content_no} 0 R >>')))
-
-    pages_kids = ' '.join(f'{page_no} 0 R' for page_no in page_numbers)
-    base_objects = [
-        (1, _pdf_object(1, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')),
-        (2, _pdf_object(2, f'<< /Type /Pages /Kids [{pages_kids}] /Count {len(page_numbers)} >>')),
-    ]
-    if logo_object:
-        base_objects.append((3, logo_object))
-    catalog_number = next_number
-    all_objects = base_objects + sorted(objects) + [(catalog_number, _pdf_object(catalog_number, '<< /Type /Catalog /Pages 2 0 R >>'))]
-    output = BytesIO()
-    output.write(b'%PDF-1.4\n')
-    offsets = [0]
-    for _, obj in sorted(all_objects):
-        offsets.append(output.tell())
-        output.write(obj)
-    xref = output.tell()
-    output.write(f'xref\n0 {catalog_number + 1}\n0000000000 65535 f \n'.encode('latin-1'))
-    for offset in offsets[1:]:
-        output.write(f'{offset:010d} 00000 n \n'.encode('latin-1'))
-    output.write(f'trailer\n<< /Size {catalog_number + 1} /Root {catalog_number} 0 R >>\nstartxref\n{xref}\n%%EOF'.encode('latin-1'))
-    response = HttpResponse(output.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
+    return '' if value is None else str(value)
 
 def _money(value):
     if value in (None, ''):
@@ -276,206 +44,309 @@ def _money(value):
 def _date_id(value):
     return value.strftime('%d/%m/%Y') if hasattr(value, 'strftime') else _text(value)
 
-def legacy_report_excel_response(filename, title, tenant, period, headers, rows, totals, extra_lines=None, header_color='#b6d2e9'):
-    extra_lines = extra_lines or []
+def _print_datetime_id():
+    return timezone.localtime().strftime('%d/%m/%Y %H:%M')
+
+def _tenant_config_value(tenant, kode, default=''):
+    if not tenant:
+        return default
+    try:
+        from master.services import get_config_value
+
+        return get_config_value(tenant, kode, required=False) or default
+    except Exception:
+        return default
+
+def _report_admin_name(tenant):
+    return _tenant_config_value(tenant, 'INVOICE_ADMIN_NAME', 'LIA WAHYUNINGSIH')
+
+def _xlsx_filename(filename):
+    base, _ = os.path.splitext(filename)
+    return f'{base}.xlsx'
+
+def _excel_color(value):
+    if not value:
+        return 'D9EAF7'
+    if isinstance(value, str):
+        return value.strip('#').upper()
+    return ''.join(f'{int(part * 255):02X}' for part in value)
+
+def _excel_add_logo(ws, tenant):
+    path = _tenant_logo_path(tenant)
+    if not path:
+        return
+    try:
+        from openpyxl.drawing.image import Image
+
+        image = Image(path)
+        image.width = 58
+        image.height = 58
+        ws.add_image(image, 'A1')
+    except Exception:
+        return
+
+def _write_xlsx_response(filename, workbook):
+    output = BytesIO()
+    workbook.save(output)
+    response = HttpResponse(
+        output.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{_xlsx_filename(filename)}"'
+    return response
+
+def excel_response(filename, title, headers, rows, tenant=None, number_columns=None):
+    from openpyxl import Workbook
+    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+    number_columns = set(number_columns or [])
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Data'
     col_count = len(headers)
-    logo = _tenant_logo_data_uri(tenant)
-    logo_html = f'<img src="{logo}" style="height:56px;max-width:65px">' if logo else ''
-    html = [
-        '<html><head><meta charset="utf-8">',
-        '<style>',
-        'body{font-family:Arial,sans-serif;font-size:12px;color:#000}',
-        'table{border-collapse:collapse}',
-        'td,th{border:1px solid #000;padding:4px;vertical-align:middle}',
-        '.no-border td{border:0}',
-        '.title{font-size:16px;font-weight:bold;text-align:center;border:0}',
-        '.company{font-size:19px;font-weight:bold;border:0}',
-        '.center{text-align:center}.right{text-align:right}.bold{font-weight:bold}',
-        f'.head{{background:{header_color};font-weight:bold;text-align:center}}',
-        '</style></head><body>',
-        '<table class="no-border">',
-        '<tr>',
-        f'<td style="width:65px;border:0">{logo_html}</td>',
-        f'<td class="company" colspan="{col_count - 2}">{escape(_text(tenant.name))}</td>',
-        f'<td class="right" style="border:0">Date: {escape(_date_id(__import__("datetime").date.today()))}</td>',
-        '</tr>',
-        f'<tr><td style="border:0"></td><td style="border:0" colspan="{col_count - 1}">Office : {escape(_text(tenant.address))}, Kabupaten {escape(_text(tenant.city))}</td></tr>',
-        f'<tr><td style="border:0"></td><td style="border:0" colspan="{col_count - 1}">{escape(_text(tenant.postal_code))}, {escape(_text(tenant.province))}</td></tr>',
-        f'<tr><td class="title" colspan="{col_count}">{escape(title)}</td></tr>',
-    ]
+    _excel_add_logo(ws, tenant)
+    if tenant:
+        company_end_col = max(col_count - 1, 2) if col_count > 2 else 2
+        date_col = max(col_count, 3) if col_count > 2 else 1
+        ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=company_end_col)
+        ws.cell(1, 2, _text(tenant.name)).font = Font(bold=True, size=18)
+        ws.cell(1 if col_count > 2 else 4, date_col, f'Date: {_print_datetime_id()}').alignment = Alignment(horizontal='right')
+        ws.cell(2, 2, f'Office : {_text(tenant.address)}, Kabupaten {_text(tenant.city)}')
+        ws.cell(3, 2, f'{_text(tenant.postal_code)}, {_text(tenant.province)}')
+        title_row = 5
+    else:
+        title_row = 1
+    ws.merge_cells(start_row=title_row, start_column=1, end_row=title_row, end_column=max(col_count, 1))
+    ws.cell(title_row, 1, title).font = Font(bold=True, size=14)
+    ws.cell(title_row, 1).alignment = Alignment(horizontal='center')
+    thin = Side(style='thin', color='94A3B8')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    head_fill = PatternFill('solid', fgColor='E5E7EB')
+    start_row = title_row + 2
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(start_row, col, header)
+        cell.font = Font(bold=True)
+        cell.fill = head_fill
+        cell.border = border
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    for row_no, row in enumerate(rows, start=start_row + 1):
+        for col, value in enumerate(row, start=1):
+            is_number = isinstance(value, (int, float, Decimal))
+            is_number_column = (col - 1) in number_columns
+            cell = ws.cell(row_no, col, value if is_number else _text(value))
+            cell.border = border
+            if is_number or is_number_column:
+                cell.number_format = '#,##0.##'
+                cell.alignment = Alignment(horizontal='right')
+            else:
+                cell.alignment = Alignment(wrap_text=True)
+    for col in range(1, len(headers) + 1):
+        width = max(len(_text(ws.cell(row, col).value)) for row in range(1, ws.max_row + 1))
+        ws.column_dimensions[get_column_letter(col)].width = min(max(width + 2, 10), 40)
+    return _write_xlsx_response(filename, wb)
+
+def legacy_report_excel_response(filename, title, tenant, period, headers, rows, totals, extra_lines=None, header_color='#b6d2e9'):
+    from openpyxl import Workbook
+    from openpyxl.utils import get_column_letter
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+
+    extra_lines = extra_lines or []
+    admin_name = _report_admin_name(tenant)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = title[:31]
+    col_count = len(headers)
+    _excel_add_logo(ws, tenant)
+    ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=max(col_count - 1, 2))
+    ws.cell(1, 2, _text(tenant.name)).font = Font(bold=True, size=18)
+    ws.cell(1, col_count, f'Date: {_print_datetime_id()}').alignment = Alignment(horizontal='right')
+    ws.cell(2, 2, f'Office : {_text(tenant.address)}, Kabupaten {_text(tenant.city)}')
+    ws.cell(3, 2, f'{_text(tenant.postal_code)}, {_text(tenant.province)}')
+    title_row = 5
+    ws.merge_cells(start_row=title_row, start_column=1, end_row=title_row, end_column=col_count)
+    ws.cell(title_row, 1, title).font = Font(bold=True, size=16)
+    ws.cell(title_row, 1).alignment = Alignment(horizontal='center')
+    row_no = title_row + 1
     for line in extra_lines:
-        html.append(f'<tr><td class="center" style="border:0" colspan="{col_count}">{escape(line)}</td></tr>')
-    html.extend([
-        f'<tr><td class="center" style="border:0" colspan="{col_count}">Periode : {escape(period)}</td></tr>',
-        '</table><br><table>',
-        '<tr>',
-    ])
+        ws.merge_cells(start_row=row_no, start_column=1, end_row=row_no, end_column=col_count)
+        ws.cell(row_no, 1, line).alignment = Alignment(horizontal='center')
+        row_no += 1
+    ws.merge_cells(start_row=row_no, start_column=1, end_row=row_no, end_column=col_count)
+    ws.cell(row_no, 1, f'Periode : {period}').alignment = Alignment(horizontal='center')
+    row_no += 2
+
+    thin = Side(style='thin', color='000000')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    fill = PatternFill('solid', fgColor=_excel_color(header_color))
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row_no, col, header)
+        cell.font = Font(bold=True)
+        cell.fill = fill
+        cell.border = border
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    row_no += 1
+    for row in rows:
+        for col, (value, kind) in enumerate(row, start=1):
+            display = value if kind == 'number' else _date_id(value) if kind == 'date' else _text(value)
+            cell = ws.cell(row_no, col, display)
+            cell.border = border
+            cell.alignment = Alignment(horizontal='right' if kind == 'number' else 'center' if kind == 'center' else 'left', wrap_text=True)
+            if kind == 'number':
+                cell.number_format = '#,##0.##'
+        row_no += 1
+    col = 1
+    for value, kind, span in totals:
+        if span > 1:
+            ws.merge_cells(start_row=row_no, start_column=col, end_row=row_no, end_column=col + span - 1)
+        cell = ws.cell(row_no, col, value if kind == 'number' else _text(value))
+        cell.font = Font(bold=True)
+        cell.border = border
+        cell.alignment = Alignment(horizontal='right')
+        if kind == 'number':
+            cell.number_format = '#,##0.##'
+        for merged_col in range(col + 1, col + span):
+            ws.cell(row_no, merged_col).border = border
+        col += span
+    row_no += 3
+    ws.merge_cells(start_row=row_no, start_column=max(col_count - 3, 1), end_row=row_no, end_column=col_count)
+    ws.cell(row_no, max(col_count - 3, 1), f'Kab. Sukoharjo, {_print_datetime_id()}').alignment = Alignment(horizontal='right')
+    row_no += 1
+    ws.cell(row_no, max(col_count - 5, 1), 'Mengetahui,').alignment = Alignment(horizontal='center')
+    ws.cell(row_no, max(col_count - 1, 1), 'Yang membuat').alignment = Alignment(horizontal='center')
+    row_no += 4
+    ws.cell(row_no, max(col_count - 5, 1), '-').alignment = Alignment(horizontal='center')
+    ws.cell(row_no, max(col_count - 1, 1), admin_name).alignment = Alignment(horizontal='center')
+    row_no += 1
+    ws.cell(row_no, max(col_count - 5, 1), 'Manager Operasional').font = Font(bold=True)
+    ws.cell(row_no, max(col_count - 1, 1), 'Admin').font = Font(bold=True)
+    for column in range(1, col_count + 1):
+        width = max(len(_text(ws.cell(row, column).value)) for row in range(1, ws.max_row + 1))
+        ws.column_dimensions[get_column_letter(column)].width = min(max(width + 2, 9), 32)
+    return _write_xlsx_response(filename, wb)
+
+def _rows_html(headers, rows, totals=None, header_color='#e5e7eb', col_widths=None):
+    colgroup = ''
+    if col_widths:
+        width_sum = sum(col_widths) or 1
+        colgroup = '<colgroup>' + ''.join(f'<col style="width:{width / width_sum * 100:.2f}%">' for width in col_widths) + '</colgroup>'
+    html = [f'<table class="data">{colgroup}<thead><tr>']
     for header in headers:
-        html.append(f'<th class="head">{escape(header)}</th>')
-    html.append('</tr>')
+        html.append(f'<th style="background:{header_color}">{escape(_text(header))}</th>')
+    html.append('</tr></thead><tbody>')
     for row in rows:
         html.append('<tr>')
         for value, kind in row:
-            css = 'right' if kind == 'number' else 'center' if kind == 'center' else ''
-            display = _money(value) if kind == 'number' else _date_id(value) if kind == 'date' else _text(value)
+            css = 'num' if kind == 'number' else 'center' if kind == 'center' else ''
+            display = _text(value) if kind == 'number' and isinstance(value, str) else _money(value) if kind == 'number' else _date_id(value) if kind == 'date' else _text(value)
             html.append(f'<td class="{css}">{escape(display)}</td>')
         html.append('</tr>')
-    html.append('<tr>')
-    for value, kind, span in totals:
-        css = 'right bold' if kind == 'number' else 'right bold'
-        display = _money(value) if kind == 'number' else _text(value)
-        html.append(f'<td class="{css}" colspan="{span}">{escape(display)}</td>')
-    html.extend([
-        '</tr></table><br>',
-        '<table class="no-border" style="width:556px">',
-        f'<tr><td class="right" colspan="4">Kab. Sukoharjo, {escape(_date_id(__import__("datetime").date.today()))}</td></tr>',
-        '<tr><td></td><td class="center">Mengetahui,</td><td></td><td class="center">Yang membuat</td></tr>',
-        '<tr><td colspan="4" style="height:40px"></td></tr>',
-        '<tr><td></td><td class="center" style="border-bottom:1px solid #000">-</td><td></td><td class="center" style="border-bottom:1px solid #000">LIA WAHYUNINGSIH</td></tr>',
-        '<tr><td></td><td class="center bold">Manager Operasional</td><td></td><td class="center bold">Admin</td></tr>',
-        '</table></body></html>',
-    ])
-    response = HttpResponse(''.join(html), content_type='application/vnd.ms-excel; charset=utf-8')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    if totals:
+        html.append('<tr class="total">')
+        for item in totals:
+            if len(item) == 5:
+                _, _, value, kind, span = item
+            else:
+                value, kind, span = item
+            css = 'num' if kind == 'number' else 'label'
+            display = _text(value) if kind == 'number' and isinstance(value, str) else _money(value) if kind == 'number' else _text(value)
+            html.append(f'<td class="{css}" colspan="{span}">{escape(display)}</td>')
+        html.append('</tr>')
+    html.append('</tbody></table>')
+    return ''.join(html)
+
+def _pdf_html_document(title, tenant, body, landscape=False):
+    logo = _tenant_logo_data_uri(tenant)
+    logo_html = f'<img class="logo" src="{logo}">' if logo else '<div class="logo"></div>'
+    page_size = 'A4 landscape' if landscape else 'A4'
+    tenant_name = getattr(tenant, 'name', '')
+    tenant_address = getattr(tenant, 'address', '')
+    tenant_city = getattr(tenant, 'city', '')
+    tenant_postal_code = getattr(tenant, 'postal_code', '')
+    tenant_province = getattr(tenant, 'province', '')
+    return f'''<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@page {{ size: {page_size}; margin: 14mm 10mm; }}
+body {{ font-family: Arial, sans-serif; font-size: 9pt; color: #000; }}
+.company-header {{ display: grid; grid-template-columns: 58px 1fr auto; gap: 10px; align-items: start; border-bottom: 1px solid #000; padding-bottom: 8px; }}
+.logo {{ width: 50px; height: 50px; object-fit: contain; }}
+.company {{ font-size: 19pt; font-weight: 700; line-height: 1; }}
+.addr {{ margin-top: 4px; }}
+.date {{ text-align: right; white-space: nowrap; }}
+h1 {{ font-size: 16pt; margin: 22px 0 8px; text-align: center; }}
+.subtitle {{ text-align: center; margin: 3px 0; }}
+table.data {{ width: 100%; border-collapse: collapse; margin-top: 14px; table-layout: fixed; }}
+.data th, .data td {{ border: 1px solid #000; padding: 4px; vertical-align: middle; word-wrap: break-word; overflow-wrap: anywhere; }}
+.data th {{ text-align: center; font-weight: 700; }}
+.num {{ text-align: right; white-space: nowrap; }}
+.center {{ text-align: center; }}
+.label {{ text-align: right; font-weight: 700; }}
+.total td {{ font-weight: 700; }}
+.sign {{ width: 100%; margin-top: 28px; page-break-inside: avoid; }}
+.sign td {{ border: 0; text-align: center; height: 18px; }}
+.sign .date-line {{ text-align: right; }}
+</style>
+</head>
+<body>
+<div class="company-header">
+{logo_html}
+<div>
+<div class="company">{escape(_text(tenant_name))}</div>
+<div class="addr">Office : {escape(_text(tenant_address))}, Kabupaten {escape(_text(tenant_city))}</div>
+<div>{escape(_text(tenant_postal_code))}, {escape(_text(tenant_province))}</div>
+</div>
+<div class="date">Date: {escape(_print_datetime_id())}</div>
+</div>
+<h1>{escape(title)}</h1>
+{body}
+</body>
+</html>'''
+
+def _weasy_response(filename, html, inline=False):
+    if os.name == 'nt':
+        dll_dir = r'C:\msys64\ucrt64\bin'
+        if os.path.isdir(dll_dir) and hasattr(os, 'add_dll_directory'):
+            _DLL_DIR_HANDLES.append(os.add_dll_directory(dll_dir))
+    from weasyprint import HTML
+
+    response = HttpResponse(HTML(string=html).write_pdf(), content_type='application/pdf')
+    disposition = 'inline' if inline else 'attachment'
+    response['Content-Disposition'] = f'{disposition}; filename="{filename}"'
     return response
 
-def legacy_report_pdf_response(filename, title, tenant, period, columns, rows, totals, extra_lines=None, header_rgb=(0.71, 0.82, 0.91), title_italic=False):
-    extra_lines = extra_lines or []
-    width, height = 595, 842
-    margin_x = 20
-    top = height - 20
-    content_width = 556
-    row_h = 20
-    header_h = 40 if any('\n' in col['label'] for col in columns) else 20
-    title_h = 186 if extra_lines else 149
-    rows_per_page = max(int((height - title_h - header_h - 210) / row_h), 1)
-    chunks = [rows[i:i + rows_per_page] for i in range(0, len(rows), rows_per_page)] or [[]]
-    objects = []
-    page_numbers = []
-    logo_object, logo_meta = _pdf_logo_object(tenant, 4)
-    next_number = 5 if logo_object else 4
-
-    def cmd_text(x, y, text, size=9, bold=False, center=False, right=False):
-        font = '/F2' if bold else '/F1'
-        safe = _pdf_escape(text)
-        if center:
-            x = x - (len(text) * size * 0.25)
-        elif right:
-            x = x - (len(text) * size * 0.5)
-        return f'BT {font} {size} Tf 1 0 0 1 {x:.2f} {y:.2f} Tm ({safe}) Tj ET'
-
-    def rect(x, y, w, h, fill=False):
-        return f'{x:.2f} {y:.2f} {w:.2f} {h:.2f} re ' + ('f' if fill else 'S')
-
-    def wrap_label(label, width, size):
-        lines = []
-        max_chars = max(int(width / (size * 0.55)), 1)
-        for part in label.split('\n'):
-            current = ''
-            for word in part.split():
-                candidate = f'{current} {word}'.strip()
-                if len(candidate) <= max_chars:
-                    current = candidate
-                    continue
-                if current:
-                    lines.append(current)
-                current = word
-            if current:
-                lines.append(current)
-        return lines or ['']
-
-    for page_index, chunk in enumerate(chunks, start=1):
-        page_no = next_number
-        content_no = next_number + 1
-        next_number += 2
-        page_numbers.append(page_no)
-        lines = []
-        y = top
-        if page_index == 1:
-            logo_cmd = _pdf_draw_logo(logo_meta, margin_x, y - 68, max_w=55, max_h=55)
-            if logo_cmd:
-                lines.append(logo_cmd)
-            lines.append(cmd_text(margin_x + 420, y - 12, 'Date:', 9, right=True))
-            lines.append(cmd_text(margin_x + 554, y - 12, _date_id(__import__('datetime').date.today()), 9, right=True))
-            lines.append(cmd_text(margin_x + 67, y - 18, _text(tenant.name), 19, bold=True))
-            lines.append(cmd_text(margin_x + 67, y - 33, f'Office : {_text(tenant.address)}, Kabupaten {_text(tenant.city)}', 9))
-            lines.append(cmd_text(margin_x + 67, y - 48, f'{_text(tenant.postal_code)}, {_text(tenant.province)}', 9))
-            lines.append(f'{margin_x} {y - 80:.2f} m {margin_x + content_width} {y - 80:.2f} l S')
-            lines.append(cmd_text(margin_x + content_width / 2, y - 108, title, 16, bold=True, center=True))
-            line_y = y - 130
-            for line in extra_lines:
-                lines.append(cmd_text(margin_x + content_width / 2, line_y, line, 9, center=True))
-                line_y -= 15
-            lines.append(cmd_text(margin_x + content_width / 2, line_y, f'Periode : {period}', 9, center=True))
-            y = top - title_h
-        else:
-            lines.append(cmd_text(margin_x + content_width / 2, y - 18, title, 12, bold=True, center=True))
-            y -= 50
-        lines.append(f'{header_rgb[0]} {header_rgb[1]} {header_rgb[2]} rg')
-        for col in columns:
-            lines.append(rect(margin_x + col['x'], y - header_h, col['w'], header_h, fill=True))
-        lines.append('0 0 0 RG 0 0 0 rg')
-        for col in columns:
-            lines.append(rect(margin_x + col['x'], y - header_h, col['w'], header_h))
-            label_lines = wrap_label(col['label'], col['w'], col.get('header_size', 9))
-            base_y = y - 14 if len(label_lines) == 1 else y - 12
-            for idx, label in enumerate(label_lines):
-                lines.append(cmd_text(margin_x + col['x'] + col['w'] / 2, base_y - (idx * 10), label, col.get('header_size', 9), bold=True, center=True))
-        y -= header_h
-        for row_index, row in enumerate(chunk, start=1 + (page_index - 1) * rows_per_page):
-            for col, (value, kind) in zip(columns, row):
-                lines.append(rect(margin_x + col['x'], y - row_h, col['w'], row_h))
-                display = _money(value) if kind == 'number' else _date_id(value) if kind == 'date' else _text(value)
-                display = display.replace('\n', ' ')
-                if len(display) > col.get('max', 28):
-                    display = display[:col.get('max', 28) - 1] + '.'
-                text_x = margin_x + col['x'] + col['w'] - 3 if kind == 'number' else margin_x + col['x'] + 3
-                lines.append(cmd_text(text_x, y - 14, display, col.get('size', 9), right=(kind == 'number')))
-            y -= row_h
-        if page_index == len(chunks):
-            for x, w, value, kind, span_label in totals:
-                lines.append(rect(margin_x + x, y - row_h, w, row_h))
-                display = _money(value) if kind == 'number' else _text(value)
-                lines.append(cmd_text(margin_x + x + w - 3, y - 14, display, 9, bold=True, right=True))
-            y -= 58
-            lines.append(cmd_text(margin_x + content_width, y, f'Kab. Sukoharjo, {_date_id(__import__("datetime").date.today())}', 9, right=True))
-            y -= 22
-            lines.append(cmd_text(margin_x + 250, y, 'Mengetahui,', 9, center=True))
-            lines.append(cmd_text(margin_x + 476, y, 'Yang membuat', 9, center=True))
-            y -= 60
-            lines.append(cmd_text(margin_x + 250, y, '-', 9, center=True))
-            lines.append(f'{margin_x + 200} {y - 3:.2f} m {margin_x + 300} {y - 3:.2f} l S')
-            lines.append(cmd_text(margin_x + 476, y, 'LIA WAHYUNINGSIH', 9, center=True))
-            lines.append(f'{margin_x + 426} {y - 3:.2f} m {margin_x + 526} {y - 3:.2f} l S')
-            y -= 20
-            lines.append(cmd_text(margin_x + 250, y, 'Manager Operasional', 9, bold=True, center=True))
-            lines.append(cmd_text(margin_x + 476, y, 'Admin', 9, bold=True, center=True))
-        content = _pdf_stream(lines)
-        objects.append((content_no, _pdf_object(content_no, f'<< /Length {len(content)} >>\nstream\n' + content.decode('latin-1') + '\nendstream')))
-        xobjects = f'/XObject << /Logo {logo_meta["number"]} 0 R >> ' if logo_meta else ''
-        objects.append((page_no, _pdf_object(page_no, f'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] /Resources << /Font << /F1 1 0 R /F2 3 0 R >> {xobjects}>> /Contents {content_no} 0 R >>')))
-
-    pages_kids = ' '.join(f'{page_no} 0 R' for page_no in page_numbers)
-    catalog_number = next_number
-    all_objects = [
-        (1, _pdf_object(1, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')),
-        (2, _pdf_object(2, f'<< /Type /Pages /Kids [{pages_kids}] /Count {len(page_numbers)} >>')),
-        (3, _pdf_object(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>')),
+def pdf_response(filename, title, headers, rows, landscape=True, tenant=None, number_columns=None, col_widths=None):
+    number_columns = set(number_columns or [])
+    typed_rows = [
+        [
+            (value, 'number' if col in number_columns or isinstance(value, (int, float, Decimal)) else 'text')
+            for col, value in enumerate(row)
+        ]
+        for row in rows
     ]
-    if logo_object:
-        all_objects.append((4, logo_object))
-    all_objects = all_objects + sorted(objects) + [(catalog_number, _pdf_object(catalog_number, '<< /Type /Catalog /Pages 2 0 R >>'))]
-    output = BytesIO()
-    output.write(b'%PDF-1.4\n')
-    offsets = [0]
-    for _, obj in sorted(all_objects):
-        offsets.append(output.tell())
-        output.write(obj)
-    xref = output.tell()
-    output.write(f'xref\n0 {catalog_number + 1}\n0000000000 65535 f \n'.encode('latin-1'))
-    for offset in offsets[1:]:
-        output.write(f'{offset:010d} 00000 n \n'.encode('latin-1'))
-    output.write(f'trailer\n<< /Size {catalog_number + 1} /Root {catalog_number} 0 R >>\nstartxref\n{xref}\n%%EOF'.encode('latin-1'))
-    response = HttpResponse(output.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    return response
+    html = _pdf_html_document(title, tenant, _rows_html(headers, typed_rows, col_widths=col_widths), landscape=landscape)
+    return _weasy_response(filename, html)
+
+def legacy_report_pdf_response(filename, title, tenant, period, columns, rows, totals, extra_lines=None, header_rgb=(0.71, 0.82, 0.91), title_italic=False, landscape=False):
+    extra_lines = extra_lines or []
+    admin_name = _report_admin_name(tenant)
+    subtitles = ''.join(f'<div class="subtitle">{escape(line)}</div>' for line in extra_lines)
+    subtitles += f'<div class="subtitle">Periode : {escape(period)}</div>'
+    body = subtitles + _rows_html(
+        [col['label'].replace('\n', ' ') for col in columns],
+        rows,
+        totals,
+        header_color='#' + _excel_color(header_rgb),
+        col_widths=[col['w'] for col in columns],
+    )
+    body += f'''
+<table class="sign">
+<tr><td colspan="4" class="date-line">Kab. Sukoharjo, {escape(_print_datetime_id())}</td></tr>
+<tr><td></td><td>Mengetahui,</td><td></td><td>Yang membuat</td></tr>
+<tr><td colspan="4" style="height:46px"></td></tr>
+<tr><td></td><td style="border-bottom:1px solid #000">-</td><td></td><td style="border-bottom:1px solid #000">{escape(admin_name)}</td></tr>
+<tr><td></td><td><strong>Manager Operasional</strong></td><td></td><td><strong>Admin</strong></td></tr>
+</table>'''
+    return _weasy_response(filename, _pdf_html_document(title, tenant, body, landscape=landscape))

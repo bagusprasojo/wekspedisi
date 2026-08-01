@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, render
 
 from accounting.models import Journal
 from core.exporters import excel_response, legacy_report_excel_response, legacy_report_pdf_response, pdf_response
+from core.templatetags.crud_extras import format_money
 from master.models import Armada, BankAccount
 from master.models import ChartOfAccount
 from reports import services
@@ -190,18 +191,18 @@ def rekap_transaksi_kas(request):
             period,
             [
                 {'label': 'No', 'x': 0, 'w': 32, 'max': 4},
-                {'label': 'Tanggal', 'x': 32, 'w': 63, 'max': 8},
-                {'label': 'Account & Keterangan', 'x': 95, 'w': 265, 'max': 48},
-                {'label': 'Keluar', 'x': 360, 'w': 80, 'max': 14},
-                {'label': 'Masuk', 'x': 440, 'w': 82, 'max': 14},
-                {'label': 'Pc', 'x': 522, 'w': 32, 'max': 6},
+                {'label': 'Tanggal', 'x': 32, 'w': 55, 'max': 8},
+                {'label': 'Account & Keterangan', 'x': 95, 'w': 244, 'max': 42},
+                {'label': 'Keluar', 'x': 322, 'w': 80, 'max': 14},
+                {'label': 'Masuk', 'x': 402, 'w': 82, 'max': 14},
+                {'label': 'Pc', 'x': 484, 'w': 70, 'max': 13},
             ],
             export_rows,
             [
-                (0, 360, 'Total   ', 'text', 3),
-                (360, 80, sum((row.nominal_keluar for row in rows), ZERO), 'number', 1),
-                (440, 82, sum((row.nominal_masuk for row in rows), ZERO), 'number', 1),
-                (522, 32, '', 'text', 1),
+                (0, 322, 'Total   ', 'text', 3),
+                (322, 80, sum((row.nominal_keluar for row in rows), ZERO), 'number', 1),
+                (402, 82, sum((row.nominal_masuk for row in rows), ZERO), 'number', 1),
+                (484, 70, '', 'text', 1),
             ],
             header_rgb=(0.71, 0.82, 0.91),
         )
@@ -265,18 +266,18 @@ def riwayat_pembelian_bbm(request):
             [
                 {'label': 'No', 'x': 0, 'w': 20, 'max': 4, 'size': 8, 'header_size': 9},
                 {'label': 'Tanggal', 'x': 20, 'w': 59, 'max': 8, 'size': 8, 'header_size': 9},
-                {'label': 'Driver', 'x': 79, 'w': 103, 'max': 18, 'size': 8, 'header_size': 9},
-                {'label': 'Keterangan', 'x': 182, 'w': 137, 'max': 26, 'size': 8, 'header_size': 9},
-                {'label': 'KM\nAwal', 'x': 320, 'w': 50, 'max': 8, 'size': 8, 'header_size': 9},
-                {'label': 'KM\nAkhir', 'x': 370, 'w': 50, 'max': 8, 'size': 8, 'header_size': 9},
-                {'label': 'Jarak\nTempuh (KM)', 'x': 420, 'w': 40, 'max': 7, 'size': 8, 'header_size': 8},
-                {'label': 'Pengisian', 'x': 460, 'w': 60, 'max': 10, 'size': 8, 'header_size': 9},
-                {'label': 'Pc', 'x': 520, 'w': 34, 'max': 6, 'size': 8, 'header_size': 9},
+                {'label': 'Driver', 'x': 79, 'w': 80, 'max': 14, 'size': 8, 'header_size': 9},
+                {'label': 'Keterangan', 'x': 159, 'w': 118, 'max': 22, 'size': 8, 'header_size': 9},
+                {'label': 'KM\nAwal', 'x': 277, 'w': 50, 'max': 8, 'size': 8, 'header_size': 9},
+                {'label': 'KM\nAkhir', 'x': 327, 'w': 50, 'max': 8, 'size': 8, 'header_size': 9},
+                {'label': 'Jarak\nTempuh (KM)', 'x': 377, 'w': 55, 'max': 10, 'size': 8, 'header_size': 8},
+                {'label': 'Pengisian', 'x': 432, 'w': 62, 'max': 10, 'size': 8, 'header_size': 9},
+                {'label': 'Pc', 'x': 494, 'w': 60, 'max': 13, 'size': 8, 'header_size': 9},
             ],
             export_rows,
             [
-                (0, 460, 'Total  ', 'text', 7),
-                (460, 94, sum((row.nominal_bbm for row in rows), ZERO), 'number', 2),
+                (0, 432, 'Total  ', 'text', 7),
+                (432, 122, sum((row.nominal_bbm for row in rows), ZERO), 'number', 2),
             ],
             extra_lines=extra_lines,
             header_rgb=(0.38, 0.98, 0.98),
@@ -349,23 +350,26 @@ def rekening_koran(request):
     running = saldo_awal
     display_rows = []
     for row in rows:
-        running += row.kredit - row.debet
-        display_rows.append({'object': row, 'saldo': running})
+        running += row['kredit'] - row['debet']
+        display_rows.append({**row, 'saldo': running})
     if request.GET.get('export') in {'excel', 'pdf'}:
         period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
         extra_lines = []
         if bank:
-            extra_lines = [f'{bank.no_rekening}      {bank.nama_bank}', f'Atas Nama : {bank.atas_nama}', f'Saldo Awal : {saldo_awal}']
+            extra_lines = [
+                f'No Rekening : {bank.no_rekening}     Nama Bank : {bank.nama_bank}',
+                f'Atas Nama : {bank.atas_nama}     Saldo Awal : {format_money(saldo_awal)}',
+            ]
         export_rows = [
             [
                 (index, 'number'),
-                (row['object'].tanggal.strftime('%d/%m/%y'), 'center'),
-                (row['object'].jenis_transaksi.kode, 'center'),
-                (row['object'].debet, 'number'),
-                (row['object'].kredit, 'number'),
-                (row['object'].created_by.username if row['object'].created_by else '', 'text'),
+                (row['tanggal'].strftime('%d/%m/%Y'), 'center'),
+                (row['kode'], 'center'),
+                (row['uraian'], 'text'),
+                (row['debet'], 'number'),
+                (row['kredit'], 'number'),
                 (row['saldo'], 'number'),
-                (row['object'].uraian, 'text'),
+                (row['user_create'], 'text'),
             ]
             for index, row in enumerate(display_rows, start=1)
         ]
@@ -375,7 +379,7 @@ def rekening_koran(request):
                 'Rekening Koran',
                 request.tenant,
                 period,
-                ['No', 'Tanggal', 'Kode', 'Debet', 'Kredit', 'Pc', 'Saldo', 'Uraian'],
+                ['No', 'Tanggal', 'Kode', 'Uraian', 'Debet', 'Kredit', 'Saldo', 'Pc'],
                 export_rows,
                 [],
                 extra_lines=extra_lines,
@@ -386,18 +390,19 @@ def rekening_koran(request):
             request.tenant,
             period,
             [
-                {'label': 'No', 'x': 0, 'w': 26, 'max': 4},
-                {'label': 'Tanggal', 'x': 26, 'w': 58, 'max': 8},
-                {'label': 'Kode', 'x': 84, 'w': 45, 'max': 8},
-                {'label': 'Debet', 'x': 129, 'w': 70, 'max': 12},
-                {'label': 'Kredit', 'x': 199, 'w': 70, 'max': 12},
-                {'label': 'Pc', 'x': 269, 'w': 32, 'max': 6},
-                {'label': 'Saldo', 'x': 301, 'w': 75, 'max': 12},
-                {'label': 'Uraian', 'x': 376, 'w': 178, 'max': 34},
+                {'label': 'No', 'x': 0, 'w': 30, 'max': 4},
+                {'label': 'Tanggal', 'x': 30, 'w': 65, 'max': 8},
+                {'label': 'Kode', 'x': 100, 'w': 50, 'max': 8},
+                {'label': 'Uraian', 'x': 150, 'w': 344, 'max': 34},
+                {'label': 'Debet', 'x': 494, 'w': 75, 'max': 12},
+                {'label': 'Kredit', 'x': 584, 'w': 75, 'max': 12},
+                {'label': 'Saldo', 'x': 674, 'w': 90, 'max': 12},
+                {'label': 'Pc', 'x': 764, 'w': 60, 'max': 6},
             ],
             export_rows,
             [],
             extra_lines=extra_lines,
+            landscape=True,
         )
     return render(
         request,

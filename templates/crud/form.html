@@ -10,7 +10,7 @@
     {% include 'includes/form_warnings.html' %}
     <div class="grid {% if form_model_name == 'banktransaction' %}gap-3 md:grid-cols-4{% else %}gap-4 md:grid-cols-2{% endif %}">
         {% for field in form.visible_fields %}
-        <label class="block text-sm {% if form_model_name == 'banktransaction' %}{% if field.name == 'debet' or field.name == 'kredit' or field.name == 'biaya_adm_bank' %}md:col-span-1{% elif field.name == 'uraian' %}md:col-span-4{% else %}md:col-span-2{% endif %}{% elif field.field.widget.input_type == 'textarea' %}md:col-span-2{% endif %}" {% if field.name == 'perkiraan_pph' %}x-show="showPph"{% elif field.name == 'bank_tujuan' or field.name == 'biaya_adm_bank' %}x-show="isBankTransfer"{% elif form_model_name == 'banktransaction' and field.name == 'kredit' %}x-show="!isBankTransfer"{% endif %}>
+        <label class="block text-sm {% if form_model_name == 'banktransaction' %}{% if field.name == 'debet' or field.name == 'kredit' or field.name == 'biaya_adm_bank' %}md:col-span-1{% elif field.name == 'uraian' %}md:col-span-4{% else %}md:col-span-2{% endif %}{% elif field.field.widget.input_type == 'textarea' %}md:col-span-2{% endif %}" {% if field.name == 'perkiraan_pph' %}x-show="showPph"{% elif field.name == 'bank_tujuan' or field.name == 'biaya_adm_bank' %}x-show="isBankTransfer"{% endif %}>
             <span class="mb-1 block font-medium">{{ field.label }}</span>
             {% if form_model_name == 'armada' and field.name == 'driver_text' %}
                 <span class="relative block" x-data="autocompleteLookup('{% url 'master_lookup_stakeholder' %}?jenis=karyawan', 'id_driver', '{{ field.value|default_if_none:''|escapejs }}')" x-init="init()">
@@ -214,6 +214,7 @@ function transactionCalculator(modelName) {
         paymentPpn: 0,
         showPph: true,
         isBankTransfer: false,
+        bankTransactionCode: '',
         cashAdvanceName: '',
         cashAdvanceAddress: '',
         cashAdvanceBalance: '',
@@ -238,6 +239,7 @@ function transactionCalculator(modelName) {
                 if (input) input.addEventListener('input', () => this.calculate());
                 if (input) input.addEventListener('change', () => this.calculate());
             });
+            if (this.modelName === 'banktransaction') this.applyBankTransactionInputs(false);
         },
         value(id) {
             const input = document.getElementById(id);
@@ -247,9 +249,28 @@ function transactionCalculator(modelName) {
             const input = document.getElementById(id);
             return input && input.selectedOptions.length ? input.selectedOptions[0].textContent.trim() : '';
         },
+        selectedCode(id) {
+            const text = this.selectedText(id);
+            return text.split(/\s|-/)[0] || '';
+        },
         setValue(id, value) {
             const input = document.getElementById(id);
             if (input) input.value = value.toFixed(2);
+        },
+        setDisabled(id, disabled, clear) {
+            const input = document.getElementById(id);
+            if (!input) return;
+            input.disabled = disabled;
+            if (disabled && clear) input.value = '0.00';
+            input.classList.toggle('bg-slate-100', disabled);
+            input.classList.toggle('text-slate-500', disabled);
+        },
+        applyBankTransactionInputs(clearDisabled) {
+            const code = this.selectedCode('id_jenis_transaksi');
+            const disableDebet = ['01', '03'].includes(code);
+            const disableKredit = ['02', '08', '20'].includes(code);
+            this.setDisabled('id_debet', disableDebet, clearDisabled);
+            this.setDisabled('id_kredit', disableKredit, clearDisabled);
         },
         setCashAdvanceInfo(select) {
             const option = select.selectedOptions.length ? select.selectedOptions[0] : null;
@@ -288,7 +309,10 @@ function transactionCalculator(modelName) {
                 this.showPph = this.paymentPph > 0 || this.value('id_pph_persen') > 0;
             }
             if (this.modelName === 'banktransaction') {
-                this.isBankTransfer = this.selectedText('id_jenis_transaksi').startsWith('20');
+                const code = this.selectedCode('id_jenis_transaksi');
+                this.isBankTransfer = code === '20';
+                this.applyBankTransactionInputs(code !== this.bankTransactionCode);
+                this.bankTransactionCode = code;
             }
         },
         round(value) { return Math.round((value + Number.EPSILON) * 100) / 100; },

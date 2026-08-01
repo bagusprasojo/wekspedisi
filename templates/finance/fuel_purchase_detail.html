@@ -11,11 +11,11 @@
             <div><p class="text-slate-500">No Bukti</p><p class="font-semibold">{{ object.no_bukti }}</p></div>
             <div><p class="text-slate-500">Tanggal</p><p class="font-semibold">{{ object.tanggal }}</p></div>
             <div><p class="text-slate-500">Kas/Bank</p><p class="font-semibold">{{ object.bank }}</p></div>
-            <div><p class="text-slate-500">Untuk Armada</p><p class="font-semibold">{{ object.armada|default:"-" }}</p></div>
-            <div><p class="text-slate-500">Akun Kas</p><p class="font-semibold">{{ object.akun_kas }}</p></div>
-            <div><p class="text-slate-500">Akun Biaya/Pendapatan</p><p class="font-semibold">{{ object.akun_transaksi }}</p></div>
-            <div><p class="text-slate-500">Uang Keluar</p><p class="font-semibold">{{ object.nominal_keluar|format_money }}</p></div>
-            <div><p class="text-slate-500">Uang Masuk</p><p class="font-semibold">{{ object.nominal_masuk|format_money }}</p></div>
+            <div><p class="text-slate-500">Armada</p><p class="font-semibold">{{ object.armada }}</p></div>
+            <div><p class="text-slate-500">Driver</p><p class="font-semibold">{{ object.driver|default:"-" }}</p></div>
+            <div><p class="text-slate-500">KM Terakhir</p><p class="font-semibold">{{ object.km_terakhir }}</p></div>
+            <div><p class="text-slate-500">KM Sekarang</p><p class="font-semibold">{{ object.km_sekarang }}</p></div>
+            <div><p class="text-slate-500">Nominal BBM</p><p class="font-semibold">{{ object.nominal_bbm|format_money }}</p></div>
         </div>
         <div class="mt-4">
             <p class="text-slate-500">Keterangan</p>
@@ -54,7 +54,7 @@
     <div class="flex gap-2">
         <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{{ cancel_url }}">Kembali</a>
         {% if not object|is_closed_transaction %}
-        <a class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" href="{% url 'finance_transaksi_kas_update' object.uuid %}">Edit</a>
+        <a class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" href="{% url 'finance_pembelian_bbm_update' object.uuid %}">Edit</a>
         {% endif %}
     </div>
 </div>

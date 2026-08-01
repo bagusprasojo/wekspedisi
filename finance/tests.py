@@ -9,6 +9,8 @@ from accounting.models import ClosingPeriod, Journal
 from accounting.services import generated_transaction_key
 from accounts.models import UserProfile
 from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase
+from finance.urls import CONFIGS
+from core.templatetags.crud_extras import is_money_field
 from master.models import Armada, BankAccount, ChartOfAccount, StakeHolder, TransactionType
 from tenants.models import Tenant
 
@@ -221,6 +223,26 @@ class FuelPurchaseLastKmTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'km_terakhir': 225})
+
+class FuelPurchaseListConfigTests(TestCase):
+    def test_fuel_purchase_list_labels_and_nominal_alignment(self):
+        labels = dict(CONFIGS['pembelian-bbm'].get_list_headers())
+
+        self.assertEqual(labels['km_terakhir'], 'KM Terakhir')
+        self.assertEqual(labels['km_sekarang'], 'KM Sekarang')
+        self.assertEqual(labels['nominal_bbm'], 'Nominal BBM')
+        self.assertTrue(is_money_field('nominal_bbm'))
+
+class BankTransactionListConfigTests(TestCase):
+    def test_bank_transaction_pdf_widths_widen_no_bukti_and_narrow_money_columns(self):
+        config = CONFIGS['transaksi-bank']
+        fields = config.list_display
+        widths = dict(zip(fields, config.list_pdf_widths))
+
+        self.assertGreater(widths['no_bukti'], widths['debet'])
+        self.assertGreater(widths['bank_utama.no_rekening'], 0.9)
+        self.assertEqual(widths['debet'], widths['kredit'])
+        self.assertEqual(widths['debet'], widths['biaya_adm_bank'])
 
 class CashTransactionAccountLookupTests(TestCase):
     def test_lookup_returns_only_active_leaf_tenant_accounts(self):

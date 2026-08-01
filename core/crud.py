@@ -211,12 +211,13 @@ class TenantDeleteMixin(TenantRequiredMixin):
 
 
 class CrudConfig:
-    def __init__(self, *, model, form_class, title, list_display, search_fields=None, success_url_name=None, detail_url_name=None, date_filter_field=None, list_labels=None, hide_list_edit=False, list_actions=None, fixed_filters=None, fixed_values=None):
+    def __init__(self, *, model, form_class, title, list_display, search_fields=None, success_url_name=None, detail_url_name=None, date_filter_field=None, list_labels=None, list_pdf_widths=None, hide_list_edit=False, list_actions=None, fixed_filters=None, fixed_values=None):
         self.model = model
         self.form_class = form_class
         self.title = title
         self.list_display = list_display
         self.list_labels = list_labels or {}
+        self.list_pdf_widths = list_pdf_widths
         self.search_fields = search_fields or []
         self.success_url_name = success_url_name
         self.detail_url_name = detail_url_name
@@ -258,6 +259,7 @@ def build_crud_views(config):
                 queryset = self.get_queryset()
                 headers = config.get_list_headers()
                 labels = [label for _, label in headers]
+                number_columns = [index for index, (field_name, _) in enumerate(headers) if is_money_field(field_name)]
                 rows = []
                 for obj in queryset:
                     row = []
@@ -269,8 +271,8 @@ def build_crud_views(config):
                     rows.append(row)
                 filename = config.title.lower().replace(' ', '-')
                 if export == 'excel':
-                    return excel_response(f'{filename}.xls', config.title, labels, rows, tenant=request.tenant)
-                return pdf_response(f'{filename}.pdf', config.title, labels, rows, tenant=request.tenant)
+                    return excel_response(f'{filename}.xls', config.title, labels, rows, tenant=request.tenant, number_columns=number_columns)
+                return pdf_response(f'{filename}.pdf', config.title, labels, rows, tenant=request.tenant, number_columns=number_columns, col_widths=config.list_pdf_widths)
             return super().get(request, *args, **kwargs)
 
         def get_context_data(self, **kwargs):

@@ -46,24 +46,24 @@
                 <th class="px-4 py-3 font-medium">No</th>
                 <th class="px-4 py-3 font-medium">Tanggal</th>
                 <th class="px-4 py-3 font-medium">Kode</th>
+                <th class="px-4 py-3 font-medium">Uraian</th>
                 <th class="px-4 py-3 text-right font-medium">Debet</th>
                 <th class="px-4 py-3 text-right font-medium">Kredit</th>
-                <th class="px-4 py-3 font-medium">Pc</th>
                 <th class="px-4 py-3 text-right font-medium">Saldo</th>
-                <th class="px-4 py-3 font-medium">Uraian</th>
+                <th class="px-4 py-3 font-medium">Pc</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
             {% for row in rows %}
             <tr>
                 <td class="px-4 py-3">{{ forloop.counter }}</td>
-                <td class="px-4 py-3">{{ row.object.tanggal|date:"d/m/Y" }}</td>
-                <td class="px-4 py-3">{{ row.object.jenis_transaksi.kode }}</td>
-                <td class="px-4 py-3 text-right">{{ row.object.debet|format_money }}</td>
-                <td class="px-4 py-3 text-right">{{ row.object.kredit|format_money }}</td>
-                <td class="px-4 py-3">{{ row.object.created_by|default:"" }}</td>
+                <td class="px-4 py-3">{{ row.tanggal|date:"d/m/Y" }}</td>
+                <td class="px-4 py-3">{{ row.kode }}</td>
+                <td class="px-4 py-3">{{ row.uraian }}</td>
+                <td class="px-4 py-3 text-right">{{ row.debet|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ row.kredit|format_money }}</td>
                 <td class="px-4 py-3 text-right">{{ row.saldo|format_money }}</td>
-                <td class="px-4 py-3">{{ row.object.uraian }}</td>
+                <td class="px-4 py-3">{{ row.user_create }}</td>
             </tr>
             {% empty %}
             <tr><td class="px-4 py-6 text-center text-slate-500" colspan="8">{% if selected_bank %}Belum ada data.{% else %}Pilih no rekening dulu.{% endif %}</td></tr>

@@ -1,15 +1,25 @@
 from datetime import date
 from decimal import Decimal
+from unittest import SkipTest
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
+from accounts.models import UserProfile
 from accounting.models import Journal
 from accounting.services import generated_transaction_key
 from invoice.models import CustomerInvoice, CustomerInvoicePayment
 from master.models import BankAccount, ChartOfAccount, StakeHolder, TenantConfig
 from tenants.models import Tenant
+
+def require_weasyprint():
+    try:
+        from core.exporters import _weasy_response
+
+        _weasy_response('test.pdf', '<p>x</p>')
+    except Exception as exc:
+        raise SkipTest(f'WeasyPrint native dependency belum tersedia: {exc}') from exc
 
 
 class CustomerInvoiceLegacyRuleTests(TestCase):
@@ -25,6 +35,9 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
         TenantConfig.objects.create(tenant=self.tenant, kode='AKUN_PENDAPATAN_JASA', nilai=str(self.pendapatan.pk))
         TenantConfig.objects.create(tenant=self.tenant, kode='AKUN_PPN_ID', nilai=str(self.ppn.pk))
         TenantConfig.objects.create(tenant=self.tenant, kode='AKUN_PPH_ID', nilai=str(self.pph_account.pk))
+        TenantConfig.objects.create(tenant=self.tenant, kode='INVOICE_CODE', nilai='INV_TBL')
+        TenantConfig.objects.create(tenant=self.tenant, kode='INVOICE_ADMIN_NAME', nilai='Admin Tenant')
+        TenantConfig.objects.create(tenant=self.tenant, kode='INVOICE_PAYMENT_TEXT', nilai='Transfer Bank Test\nCV Test')
         self.bank = BankAccount.objects.create(
             tenant=self.tenant,
             no_rekening='001',
@@ -60,7 +73,7 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
 
         invoice.refresh_from_db()
         self.assertEqual(invoice.perkiraan_piutang, self.piutang)
-        self.assertEqual(invoice.ppn_persen, Decimal('11.00'))
+        self.assertEqual(invoice.ppn_persen, Decimal('12.00'))
         self.assertEqual(invoice.ppn, Decimal('110000.00'))
         self.assertEqual(invoice.total, Decimal('1110000.00'))
         self.assertEqual(invoice.terbilang, 'Satu Juta Seratus Sepuluh Ribu Rupiah')
@@ -145,3 +158,75 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
 
         with self.assertRaisesMessage(ValidationError, 'Pembayaran melebihi saldo piutang.'):
             payment.save_with_business_rules(user=self.user)
+
+    def test_invoice_and_receipt_endpoints_return_pdf(self):
+        require_weasyprint()
+        UserProfile.objects.create(user=self.user, tenant=self.tenant, role=UserProfile.Role.ADMIN)
+        invoice = CustomerInvoice(
+            tenant=self.tenant,
+            customer=self.customer,
+            tanggal=date(2026, 7, 24),
+            pekerjaan='Ongkos kirim',
+            nilai_pekerjaan=Decimal('1000000'),
+        ).save_with_business_rules(user=self.user)
+
+        self.client.force_login(self.user)
+        invoice_response = self.client.get(f'/invoice/invoice-customer/{invoice.uuid}/slip/')
+        receipt_response = self.client.get(f'/invoice/invoice-customer/{invoice.uuid}/kwitansi/')
+
+        self.assertEqual(invoice_response.status_code, 200)
+        self.assertEqual(invoice_response['Content-Type'], 'application/pdf')
+        self.assertTrue(invoice_response.content.startswith(b'%PDF'))
+        self.assertEqual(receipt_response.status_code, 200)
+        self.assertEqual(receipt_response['Content-Type'], 'application/pdf')
+        self.assertTrue(receipt_response.content.startswith(b'%PDF'))
+
+    def test_invoice_number_resets_monthly_and_uses_tenant_config_code(self):
+        TenantConfig.objects.filter(tenant=self.tenant, kode='INVOICE_CODE').update(nilai='INV_CUSTOM')
+        first = CustomerInvoice(
+            tenant=self.tenant,
+            customer=self.customer,
+            tanggal=date(2026, 7, 1),
+            pekerjaan='Ongkos kirim',
+            nilai_pekerjaan=Decimal('1000000'),
+        ).save_with_business_rules(user=self.user)
+        second = CustomerInvoice(
+            tenant=self.tenant,
+            customer=self.customer,
+            tanggal=date(2026, 8, 1),
+            pekerjaan='Ongkos kirim',
+            nilai_pekerjaan=Decimal('1000000'),
+        ).save_with_business_rules(user=self.user)
+
+        self.assertEqual(first.no_invoice, '001/VII/INV_CUSTOM/2026')
+        self.assertEqual(second.no_invoice, '001/VIII/INV_CUSTOM/2026')
+
+    def test_invoice_save_requires_invoice_tenant_configs(self):
+        TenantConfig.objects.filter(tenant=self.tenant, kode='INVOICE_CODE').delete()
+        invoice = CustomerInvoice(
+            tenant=self.tenant,
+            customer=self.customer,
+            tanggal=date(2026, 7, 24),
+            pekerjaan='Ongkos kirim',
+            nilai_pekerjaan=Decimal('1000000'),
+        )
+
+        with self.assertRaisesMessage(ValidationError, 'Konfigurasi invoice belum lengkap. Isi Config tenant: INVOICE_CODE.'):
+            invoice.save_with_business_rules(user=self.user)
+
+    def test_invoice_pdf_requires_invoice_tenant_configs(self):
+        UserProfile.objects.create(user=self.user, tenant=self.tenant, role=UserProfile.Role.ADMIN)
+        invoice = CustomerInvoice(
+            tenant=self.tenant,
+            customer=self.customer,
+            tanggal=date(2026, 7, 24),
+            pekerjaan='Ongkos kirim',
+            nilai_pekerjaan=Decimal('1000000'),
+        ).save_with_business_rules(user=self.user)
+        TenantConfig.objects.filter(tenant=self.tenant, kode='INVOICE_PAYMENT_TEXT').delete()
+
+        self.client.force_login(self.user)
+        response = self.client.get(f'/invoice/invoice-customer/{invoice.uuid}/slip/')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, 'Konfigurasi invoice belum lengkap. Isi Config tenant: INVOICE_PAYMENT_TEXT.', status_code=400)

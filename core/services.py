@@ -42,8 +42,10 @@ def next_document_number(tenant, document_type, date_value):
 
 def next_invoice_number(tenant, date_value):
     from core.models import DocumentSequence
+    from master.services import get_config_value
 
-    period = date_value.strftime('%Y')
+    period = date_value.strftime('%Y%m')
+    invoice_code = get_config_value(tenant, 'INVOICE_CODE')
     with transaction.atomic():
         sequence, _ = (
             DocumentSequence.objects.select_for_update()
@@ -57,4 +59,4 @@ def next_invoice_number(tenant, date_value):
         sequence.last_number += 1
         sequence.save(update_fields=['last_number', 'updated_at'])
         roman_month = ROMAN_MONTHS[date_value.month]
-        return f'{sequence.last_number:03d}/{roman_month}/INV_TBL/{date_value.year}'
+        return f'{sequence.last_number:03d}/{roman_month}/{invoice_code}/{date_value.year}'

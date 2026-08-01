@@ -89,6 +89,30 @@ def cash_transaction_detail(request, uuid):
 
 
 @login_required
+def fuel_purchase_detail(request, uuid):
+    require_tenant(request)
+    transaction = get_object_or_404(
+        FuelPurchase.objects.filter(tenant=request.tenant, is_deleted=False).select_related(
+            'armada',
+            'driver',
+            'bank',
+        ),
+        uuid=uuid,
+    )
+    return render(
+        request,
+        'finance/fuel_purchase_detail.html',
+        {
+            'title': f'Detail Pembelian BBM {transaction.no_bukti}',
+            'object': transaction,
+            'journal': transaction_journal(request, transaction),
+            'cancel_url': reverse('finance_pembelian_bbm_list'),
+        },
+    )
+
+
+
+@login_required
 def bank_transaction_detail(request, uuid):
     require_tenant(request)
     transaction = get_object_or_404(
