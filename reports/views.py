@@ -345,6 +345,22 @@ def rekening_koran(request):
     bank_id = request.GET.get('bank')
     if bank_id:
         bank = banks.filter(pk=bank_id).first()
+    start = filters['start_date']
+    end = filters['end_date']
+    if start.year != end.year or start.month != end.month:
+        return render(
+            request,
+            'reports/rekening_koran.html',
+            {
+                'title': 'Rekening Koran',
+                'rows': [],
+                'banks': banks,
+                'selected_bank': bank,
+                'saldo_awal': ZERO,
+                'error_message': 'Tanggal awal dan akhir harus dalam bulan dan tahun yang sama.',
+                **filters,
+            },
+        )
     rows = services.rekening_koran(request.tenant, filters['start_date'], filters['end_date'], bank=bank)
     saldo_awal = services.rekening_koran_saldo_awal(request.tenant, filters['start_date'], bank=bank)
     running = saldo_awal

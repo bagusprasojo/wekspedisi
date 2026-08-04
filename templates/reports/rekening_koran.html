@@ -28,6 +28,9 @@
     <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>
 </form>
 
+{% if error_message %}
+<div class="mb-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{{ error_message }}</div>
+{% endif %}
 {% if selected_bank %}
 <div class="mb-4 rounded border bg-white p-4 text-sm">
     <div class="grid gap-3 md:grid-cols-4">
