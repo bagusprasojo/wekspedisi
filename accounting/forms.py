@@ -11,6 +11,7 @@ FIELD_CLASS = 'w-full rounded border px-3 py-2 text-sm'
 def style_form_fields(form):
     for field in form.fields.values():
         if isinstance(field, forms.DateField):
+            field.widget = forms.DateInput(format='%Y-%m-%d', attrs=field.widget.attrs)
             field.widget.input_type = 'date'
         field.widget.attrs.setdefault('class', FIELD_CLASS)
 
@@ -87,6 +88,15 @@ JournalLineFormSet = inlineformset_factory(
     form=JournalLineForm,
     formset=BaseJournalLineFormSet,
     extra=2,
+    can_delete=True,
+)
+
+JournalLineEditFormSet = inlineformset_factory(
+    Journal,
+    JournalLine,
+    form=JournalLineForm,
+    formset=BaseJournalLineFormSet,
+    extra=0,
     can_delete=True,
 )
 

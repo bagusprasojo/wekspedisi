@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from accounting.forms import JournalForm, JournalLineFormSet
+from accounting.forms import JournalForm, JournalLineEditFormSet, JournalLineFormSet
 from accounting.models import ClosingPeriod, Journal, JournalLine
 from accounting.services import assign_number, ensure_open_period
 from audit.models import AuditLog
@@ -117,6 +117,8 @@ def journal_list(request):
             'page_obj': page_obj,
             'is_paginated': page_obj.has_other_pages(),
             'list_display': ['no_jurnal', 'tanggal', 'keterangan'],
+            'detail_url_name': 'accounting_jurnal_detail',
+            'hide_list_edit': True,
             'date_filter_field': 'tanggal',
             'start_date': start_date,
             'end_date': end_date,
@@ -209,13 +211,30 @@ def journal_create(request):
 
 
 @login_required
+def journal_detail(request, uuid):
+    require_tenant(request)
+    journal = get_object_or_404(
+        manual_journals(request).prefetch_related('lines__perkiraan'),
+        uuid=uuid,
+    )
+    return render(
+        request,
+        'accounting/journal_detail.html',
+        {
+            'title': f'Detail {JOURNAL_TITLE} {journal.no_jurnal}',
+            'object': journal,
+            'cancel_url': reverse('accounting_jurnal_list'),
+        },
+    )
+
+@login_required
 def journal_update(request, uuid):
     require_tenant(request)
     journal = get_object_or_404(manual_journals(request), uuid=uuid)
     if request.method == 'POST':
         return save_journal(request, journal, f'Edit {JOURNAL_TITLE}')
     form = JournalForm(instance=journal)
-    formset = JournalLineFormSet(instance=journal, tenant=request.tenant, prefix='lines')
+    formset = JournalLineEditFormSet(instance=journal, tenant=request.tenant, prefix='lines')
     return render_journal_form(request, form, formset, f'Edit {JOURNAL_TITLE}', journal)
 
 

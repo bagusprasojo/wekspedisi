@@ -1,4 +1,5 @@
 from calendar import monthrange
+from datetime import date
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -29,6 +30,31 @@ def ensure_last_day_of_month(date_value):
         raise BusinessRuleError('Tanggal closing harus akhir bulan.')
 
 
+def month_end(year, month):
+    return date(year, month, monthrange(year, month)[1])
+
+def next_month_end(date_value):
+    year = date_value.year + (1 if date_value.month == 12 else 0)
+    month = 1 if date_value.month == 12 else date_value.month + 1
+    return month_end(year, month)
+
+def oldest_transaction_date(tenant):
+    from accounting.models import Journal
+
+    journal = Journal.objects.filter(tenant=tenant, is_deleted=False).order_by('tanggal', 'id').first()
+    return journal.tanggal if journal else None
+
+def expected_closing_date(tenant):
+    from accounting.models import ClosingPeriod
+
+    last = ClosingPeriod.objects.filter(tenant=tenant, is_deleted=False).order_by('-tanggal').first()
+    if last:
+        return next_month_end(last.tanggal)
+    oldest = oldest_transaction_date(tenant)
+    if oldest:
+        return month_end(oldest.year, oldest.month)
+    return None
+
 def ensure_next_closing_month(tenant, date_value, current_pk=None):
     from accounting.models import ClosingPeriod
     last = ClosingPeriod.objects.filter(tenant=tenant, is_deleted=False).exclude(pk=current_pk).order_by('-tanggal').first()
@@ -38,6 +64,15 @@ def ensure_next_closing_month(tenant, date_value, current_pk=None):
     month = 1 if last.tanggal.month == 12 else last.tanggal.month + 1
     if date_value.year != year or date_value.month != month:
         raise BusinessRuleError('Closing harus dilakukan berurutan tiap bulan.')
+
+def ensure_expected_closing_date(tenant, date_value, current_pk=None):
+    if current_pk:
+        return
+    expected = expected_closing_date(tenant)
+    if not expected:
+        raise BusinessRuleError('Belum ada transaksi yang bisa diclosing.')
+    if date_value != expected:
+        raise BusinessRuleError(f'Tanggal closing berikutnya harus {expected.strftime("%d/%m/%Y")}.')
 
 
 def validate_leaf_account(account):

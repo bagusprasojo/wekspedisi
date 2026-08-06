@@ -1,6 +1,6 @@
 from django.db import models, transaction
 
-from accounting.services import assign_number, ensure_last_day_of_month, ensure_next_closing_month, ensure_open_period, refresh_closing_snapshots
+from accounting.services import assign_number, ensure_expected_closing_date, ensure_last_day_of_month, ensure_next_closing_month, ensure_open_period, refresh_closing_snapshots
 from core.models import TenantScopedModel
 
 
@@ -62,6 +62,7 @@ class ClosingPeriod(TenantScopedModel):
     def save_with_business_rules(self, user=None):
         ensure_last_day_of_month(self.tanggal)
         ensure_next_closing_month(self.tenant, self.tanggal, current_pk=self.pk)
+        ensure_expected_closing_date(self.tenant, self.tanggal, current_pk=self.pk)
         self.save()
         refresh_closing_snapshots(self, user=user)
         return self

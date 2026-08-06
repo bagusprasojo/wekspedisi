@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load crud_extras %}
 
 {% block title %}{{ title }}{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
@@ -27,7 +28,7 @@
                     {% for row in bank_balances %}
                     <tr>
                         <td class="px-4 py-3">{{ row.bank }}</td>
-                        <td class="px-4 py-3 text-right">{{ row.saldo_akhir }}</td>
+                        <td class="px-4 py-3 text-right">{{ row.saldo_akhir|format_money }}</td>
                     </tr>
                     {% empty %}
                     <tr><td class="px-4 py-6 text-center text-slate-500" colspan="2">Belum ada saldo bank/kas.</td></tr>
@@ -56,8 +57,8 @@
                         <td class="px-4 py-3">{{ row.perkiraan.kode }}</td>
                         <td class="px-4 py-3">{{ row.perkiraan.nama }}</td>
                         <td class="px-4 py-3">{{ row.saldo_normal }}</td>
-                        <td class="px-4 py-3 text-right">{{ row.debet }}</td>
-                        <td class="px-4 py-3 text-right">{{ row.kredit }}</td>
+                        <td class="px-4 py-3 text-right">{{ row.debet|format_money }}</td>
+                        <td class="px-4 py-3 text-right">{{ row.kredit|format_money }}</td>
                     </tr>
                     {% empty %}
                     <tr><td class="px-4 py-6 text-center text-slate-500" colspan="5">Belum ada saldo perkiraan.</td></tr>

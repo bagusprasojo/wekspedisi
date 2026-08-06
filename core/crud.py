@@ -26,6 +26,7 @@ class TenantRequiredMixin(LoginRequiredMixin):
 class TenantQuerysetMixin(TenantRequiredMixin):
     search_fields = []
     date_filter_field = None
+    date_filter_default = 'month'
     fixed_filters = {}
 
     def get_queryset(self):
@@ -41,8 +42,10 @@ class TenantQuerysetMixin(TenantRequiredMixin):
             queryset = queryset.filter(condition)
         if self.date_filter_field:
             today = timezone.localdate()
-            start_date = self.request.GET.get('start_date', '').strip() or today.replace(day=1).isoformat()
-            end_date = self.request.GET.get('end_date', '').strip() or today.isoformat()
+            start_default = today.replace(month=1, day=1) if self.date_filter_default == 'year' else today.replace(day=1)
+            end_default = today.replace(month=12, day=31) if self.date_filter_default == 'year' else today
+            start_date = self.request.GET.get('start_date', '').strip() or start_default.isoformat()
+            end_date = self.request.GET.get('end_date', '').strip() or end_default.isoformat()
             queryset = queryset.filter(**{f'{self.date_filter_field}__gte': start_date})
             queryset = queryset.filter(**{f'{self.date_filter_field}__lte': end_date})
         return queryset
@@ -179,6 +182,9 @@ class TenantFormMixin(TenantRequiredMixin):
                 field.input_formats = ['%Y-%m-%d']
                 field.widget = forms.DateInput(format='%Y-%m-%d', attrs=field.widget.attrs)
                 field.widget.input_type = 'date'
+                if not self.object and form.__class__.__name__ == 'ClosingPeriodForm' and field_name == 'tanggal':
+                    from accounting.services import expected_closing_date
+                    field.initial = expected_closing_date(self.request.tenant)
                 if not self.object and field_name == 'tanggal' and not field.initial:
                     field.initial = timezone.localdate()
             css = 'w-full rounded border px-3 py-2 text-sm'
@@ -211,7 +217,7 @@ class TenantDeleteMixin(TenantRequiredMixin):
 
 
 class CrudConfig:
-    def __init__(self, *, model, form_class, title, list_display, search_fields=None, success_url_name=None, detail_url_name=None, date_filter_field=None, list_labels=None, list_pdf_widths=None, hide_list_edit=False, list_actions=None, fixed_filters=None, fixed_values=None):
+    def __init__(self, *, model, form_class, title, list_display, search_fields=None, success_url_name=None, detail_url_name=None, date_filter_field=None, date_filter_default='month', list_labels=None, list_pdf_widths=None, hide_list_edit=False, list_actions=None, fixed_filters=None, fixed_values=None):
         self.model = model
         self.form_class = form_class
         self.title = title
@@ -225,6 +231,7 @@ class CrudConfig:
         self.list_actions = list_actions or []
         self.fixed_filters = fixed_filters or {}
         self.fixed_values = fixed_values or {}
+        self.date_filter_default = date_filter_default
         self.date_filter_field = date_filter_field if date_filter_field is not None else self.detect_date_filter_field()
 
     def detect_date_filter_field(self):
@@ -251,6 +258,7 @@ def build_crud_views(config):
         paginate_by = 20
         search_fields = config.search_fields
         date_filter_field = config.date_filter_field
+        date_filter_default = config.date_filter_default
         fixed_filters = config.fixed_filters
 
         def get(self, request, *args, **kwargs):
@@ -285,8 +293,8 @@ def build_crud_views(config):
                 'hide_list_edit': config.hide_list_edit,
                 'list_actions': config.list_actions,
                 'date_filter_field': config.date_filter_field,
-                'start_date': self.request.GET.get('start_date', '') or (timezone.localdate().replace(day=1).isoformat() if config.date_filter_field else ''),
-                'end_date': self.request.GET.get('end_date', '') or (timezone.localdate().isoformat() if config.date_filter_field else ''),
+                'start_date': self.request.GET.get('start_date', '') or (timezone.localdate().replace(month=1, day=1).isoformat() if config.date_filter_field and config.date_filter_default == 'year' else timezone.localdate().replace(day=1).isoformat() if config.date_filter_field else ''),
+                'end_date': self.request.GET.get('end_date', '') or (timezone.localdate().replace(month=12, day=31).isoformat() if config.date_filter_field and config.date_filter_default == 'year' else timezone.localdate().isoformat() if config.date_filter_field else ''),
                 'q': self.request.GET.get('q', ''),
             })
             return context
