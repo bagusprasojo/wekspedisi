@@ -133,9 +133,15 @@ def neraca_saldo(request):
     require_tenant(request)
     filters = report_filters(request)
     rows = services.trial_balance(request.tenant, filters['end_date'])
-    if request.GET.get('export') == 'csv':
-        csv_rows = [[row['account'].kode, row['account'].nama, row['account'].saldo_normal, row['debet'], row['kredit']] for row in rows]
-        return csv_response('neraca-saldo.csv', ['Kode Akun', 'Akun', 'Saldo Normal', 'Debet', 'Kredit'], csv_rows)
+    if request.GET.get('export') in {'excel', 'pdf'}:
+        headers = ['Kode Akun', 'Akun', 'Saldo Normal', 'Debet', 'Kredit']
+        export_rows = [
+            [row['account'].kode, row['account'].nama, row['account'].saldo_normal, row['debet'], row['kredit']]
+            for row in rows
+        ]
+        if request.GET.get('export') == 'excel':
+            return excel_response('neraca-saldo.xls', 'Neraca Saldo', headers, export_rows, tenant=request.tenant, number_columns=[3, 4])
+        return pdf_response('neraca-saldo.pdf', 'Neraca Saldo', headers, export_rows, tenant=request.tenant, number_columns=[3, 4])
     return render(request, 'reports/neraca_saldo.html', {'title': 'Neraca Saldo', 'rows': rows, **filters})
 
 

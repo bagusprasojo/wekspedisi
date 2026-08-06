@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from accounts.models import UserProfile
-from accounting.models import ClosingBankBalance, ClosingPeriod
+from accounting.models import ClosingBankBalance, ClosingPeriod, Journal
 from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase
 from invoice.models import CustomerInvoice, CustomerInvoicePayment
 from master.models import Armada, BankAccount, ChartOfAccount, StakeHolder, TransactionType
@@ -175,6 +175,33 @@ class RekeningKoranLegacyMutationTests(TestCase):
         self.assertTrue(response.content.startswith(b'%PDF'))
 
 class ReportLayoutTests(TestCase):
+    def test_neraca_saldo_formats_money_like_other_reports(self):
+        tenant = Tenant.objects.create(name='CV Test')
+        user = get_user_model().objects.create_user(username='admin-neraca')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        account = ChartOfAccount.objects.create(
+            tenant=tenant,
+            kode='501',
+            nama='Biaya',
+            saldo_normal=ChartOfAccount.NormalBalance.DEBET,
+        )
+        journal = Journal.objects.create(
+            tenant=tenant,
+            no_jurnal='JUR-1',
+            tanggal=date(2026, 7, 1),
+            transaksi='jurnal_memorial',
+            keterangan='Biaya',
+        )
+        journal.lines.create(tenant=tenant, perkiraan=account, debet=Decimal('1250000.00'), kredit=Decimal('0.00'))
+
+        self.client.force_login(user)
+        response = self.client.get('/reports/neraca-saldo/', {'end_date': '2026-07-31'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '1.250.000')
+        self.assertContains(response, '>0<')
+        self.assertNotContains(response, '1.250.000,00')
+
     def test_rekap_transaksi_kas_pdf_pc_column_fits_administrator(self):
         require_weasyprint()
         tenant = Tenant.objects.create(name='CV Test')

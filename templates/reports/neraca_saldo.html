@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load crud_extras %}
 
 {% block title %}{{ title }}{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
@@ -10,7 +11,8 @@
         <input class="rounded border px-3 py-2 text-sm" id="end_date" name="end_date" type="date" value="{{ end_date|date:'Y-m-d' }}">
     </div>
     <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Tampilkan</button>
-    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="csv">Export CSV</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="excel">Export Excel</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>
 </form>
 <div class="overflow-hidden rounded border bg-white">
     <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -29,8 +31,8 @@
                 <td class="px-4 py-3">{{ row.account.kode }}</td>
                 <td class="px-4 py-3">{{ row.account.nama }}</td>
                 <td class="px-4 py-3">{{ row.account.saldo_normal }}</td>
-                <td class="px-4 py-3 text-right">{{ row.debet }}</td>
-                <td class="px-4 py-3 text-right">{{ row.kredit }}</td>
+                <td class="px-4 py-3 text-right">{{ row.debet|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ row.kredit|format_money }}</td>
             </tr>
             {% empty %}
             <tr><td class="px-4 py-6 text-center text-slate-500" colspan="5">Belum ada data.</td></tr>
