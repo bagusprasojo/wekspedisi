@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}Platform - {{ title }}{% endblock %}
+
+{% block content %}
+<div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <form class="flex flex-wrap items-end gap-2" method="get">
+        <label class="text-sm">
+            <span class="mb-1 block font-medium text-slate-700">Tenant</span>
+            <select class="rounded border px-3 py-2 text-sm" name="tenant">
+                <option value="">Semua tenant</option>
+                {% for tenant in tenants %}
+                <option value="{{ tenant.pk }}" {% if selected_tenant|stringformat:"s" == tenant.pk|stringformat:"s" %}selected{% endif %}>{{ tenant.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="text-sm">
+            <span class="mb-1 block font-medium text-slate-700">Cari</span>
+            <input class="rounded border px-3 py-2 text-sm" name="q" placeholder="Kode/nama/akun" value="{{ q }}">
+        </label>
+        <button class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" type="submit">Tampilkan</button>
+    </form>
+    <a class="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700" href="{% url 'platform_transaction_type_create' %}{% if selected_tenant %}?tenant={{ selected_tenant }}{% endif %}">Tambah Jenis Transaksi</a>
+</div>
+
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">Tenant</th>
+                <th class="px-4 py-3 font-medium">Kode</th>
+                <th class="px-4 py-3 font-medium">Nama</th>
+                <th class="px-4 py-3 font-medium">Akun</th>
+                <th class="px-4 py-3 font-medium"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+            <tr>
+                <td class="px-4 py-3">{{ row.tenant.name }}</td>
+                <td class="px-4 py-3 font-medium">{{ row.kode }}</td>
+                <td class="px-4 py-3">{{ row.nama }}</td>
+                <td class="px-4 py-3">{{ row.akun.kode }} - {{ row.akun.nama }}</td>
+                <td class="px-4 py-3 text-right whitespace-nowrap">
+                    <a class="text-sm text-slate-700 hover:underline" href="{% url 'platform_transaction_type_edit' row.uuid %}">Edit</a>
+                    <a class="ml-3 text-sm text-red-700 hover:underline" href="{% url 'platform_transaction_type_delete' row.uuid %}">Hapus</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="5">Belum ada jenis transaksi.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 
 from accounts.models import UserProfile
+from master.models import ChartOfAccount, TenantConfig, TransactionType
 from tenants.models import Tenant
 
 FIELD_CLASS = 'w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm hover:border-slate-400 focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900'
@@ -91,3 +92,65 @@ class TenantUserCreateForm(forms.Form):
         if User.objects.filter(username=username).exists():
             raise forms.ValidationError('Username sudah digunakan.')
         return username
+
+class PlatformTenantConfigForm(forms.ModelForm):
+    class Meta:
+        model = TenantConfig
+        fields = ['tenant', 'kode', 'nilai', 'keterangan']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tenant'].queryset = Tenant.objects.order_by('name')
+        style_fields(self)
+
+    def clean(self):
+        cleaned = super().clean()
+        tenant = cleaned.get('tenant')
+        kode = cleaned.get('kode')
+        if tenant and kode:
+            exists = TenantConfig.objects.filter(tenant=tenant, kode=kode, is_deleted=False)
+            if self.instance.pk:
+                exists = exists.exclude(pk=self.instance.pk)
+            if exists.exists():
+                raise forms.ValidationError('Config dengan kode ini sudah ada untuk tenant tersebut.')
+        return cleaned
+
+class PlatformTransactionTypeForm(forms.ModelForm):
+    class Meta:
+        model = TransactionType
+        fields = ['tenant', 'kode', 'nama', 'akun']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tenant = self._selected_tenant()
+        self.fields['tenant'].queryset = Tenant.objects.order_by('name')
+        self.fields['akun'].queryset = ChartOfAccount.objects.none()
+        if tenant:
+            self.fields['akun'].queryset = ChartOfAccount.objects.filter(
+                tenant=tenant,
+                is_deleted=False,
+                is_active=True,
+            ).exclude(children__is_deleted=False).order_by('kode')
+        self.fields['akun'].help_text = 'Pilih tenant dulu agar akun tenant tersebut tampil.'
+        style_fields(self)
+
+    def _selected_tenant(self):
+        tenant_id = self.data.get('tenant') or self.initial.get('tenant') or getattr(self.instance, 'tenant_id', None)
+        if not tenant_id:
+            return None
+        return Tenant.objects.filter(pk=tenant_id).first()
+
+    def clean(self):
+        cleaned = super().clean()
+        tenant = cleaned.get('tenant')
+        kode = cleaned.get('kode')
+        account = cleaned.get('akun')
+        if tenant and kode:
+            exists = TransactionType.objects.filter(tenant=tenant, kode=kode, is_deleted=False)
+            if self.instance.pk:
+                exists = exists.exclude(pk=self.instance.pk)
+            if exists.exists():
+                raise forms.ValidationError('Jenis transaksi dengan kode ini sudah ada untuk tenant tersebut.')
+        if tenant and account and account.tenant_id != tenant.pk:
+            self.add_error('akun', 'Akun harus milik tenant yang dipilih.')
+        return cleaned

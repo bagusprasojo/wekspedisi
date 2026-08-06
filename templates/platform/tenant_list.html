@@ -10,6 +10,8 @@
         <p class="text-sm text-slate-500">Admission tenant dan pendaftaran user tenant dilakukan oleh superadmin.</p>
     </div>
     <div class="flex gap-2">
+        <a class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" href="{% url 'platform_config_list' %}">Config Tenant</a>
+        <a class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" href="{% url 'platform_transaction_type_list' %}">Jenis Transaksi</a>
         <a class="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700" href="{% url 'platform_tenant_admission' %}">Admission Tenant</a>
         <a class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" href="{% url 'platform_tenant_user_create' %}">Tambah User Tenant</a>
     </div>

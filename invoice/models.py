@@ -45,7 +45,7 @@ def require_invoice_configs(tenant):
     missing = [kode for kode in REQUIRED_INVOICE_CONFIGS if not get_config_value(tenant, kode, required=False)]
     if missing:
         raise ValidationError(
-            'Konfigurasi invoice belum lengkap. Isi Config tenant: '
+            'Konfigurasi invoice belum lengkap. Hubungi superadmin untuk melengkapi config tenant: '
             + ', '.join(missing)
             + '.'
         )

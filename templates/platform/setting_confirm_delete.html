@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}Platform - {{ title }}{% endblock %}
+
+{% block content %}
+<form class="max-w-lg rounded border bg-white p-5" method="post">
+    {% csrf_token %}
+    <p class="mb-4 text-sm">Hapus data <span class="font-semibold">{{ object }}</span>?</p>
+    <div class="flex gap-2">
+        <button class="rounded bg-red-700 px-4 py-2 text-sm text-white hover:bg-red-600" type="submit">Hapus</button>
+        <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{{ cancel_url }}">Batal</a>
+    </div>
+</form>
+{% endblock %}

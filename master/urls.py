@@ -2,8 +2,8 @@ from django.urls import path
 
 from core.crud import CrudConfig, build_crud_views
 from master import views
-from master.forms import ArmadaForm, BankAccountForm, ChartOfAccountForm, CustomerForm, KaryawanForm, TenantConfigForm, TransactionTypeForm
-from master.models import Armada, BankAccount, ChartOfAccount, StakeHolder, TenantConfig, TransactionType
+from master.forms import ArmadaForm, BankAccountForm, ChartOfAccountForm, CustomerForm, KaryawanForm
+from master.models import Armada, BankAccount, ChartOfAccount, StakeHolder
 
 CONFIGS = {
     'customer': CrudConfig(model=StakeHolder, form_class=CustomerForm, title='Customer', list_display=['nama', 'alamat', 'kota', 'kode_pos', 'telp', 'no_ktp'], list_labels={'kode_pos': 'Kode Pos', 'no_ktp': 'No KTP'}, search_fields=['nama', 'alamat', 'kota', 'kode_pos', 'telp', 'no_ktp'], success_url_name='master_customer_list', detail_url_name='master_customer_detail', hide_list_edit=True, fixed_filters={'jenis': StakeHolder.StakeHolderType.CUSTOMER}, fixed_values={'jenis': StakeHolder.StakeHolderType.CUSTOMER}),
@@ -11,8 +11,6 @@ CONFIGS = {
     'armada': CrudConfig(model=Armada, form_class=ArmadaForm, title='Armada', list_display=['nopol', 'kendaraan', 'pemilik', 'driver'], search_fields=['nopol', 'kendaraan', 'pemilik'], success_url_name='master_armada_list', detail_url_name='master_armada_detail', hide_list_edit=True),
     'bank': CrudConfig(model=BankAccount, form_class=BankAccountForm, title='Bank/Kas', list_display=['nama_bank', 'no_rekening', 'atas_nama', 'is_kas'], list_labels={'nama_bank': 'Nama Bank/Kas', 'no_rekening': 'No. Rekening', 'atas_nama': 'Atas Nama', 'is_kas': 'Kas?'}, search_fields=['nama_bank', 'no_rekening', 'atas_nama'], success_url_name='master_bank_list', detail_url_name='master_bank_detail', hide_list_edit=True),
     'akun': CrudConfig(model=ChartOfAccount, form_class=ChartOfAccountForm, title='Perkiraan/Akun', list_display=['display_kode', 'display_nama', 'golongan', 'kelompok', 'level', 'saldo_normal', 'parent', 'is_active'], list_labels={'display_kode': 'Kode', 'display_nama': 'Nama', 'golongan': 'Golongan', 'kelompok': 'Kelompok', 'level': 'Level', 'saldo_normal': 'Saldo Normal', 'parent': 'Akun Parent', 'is_active': 'Aktif?'}, search_fields=['kode', 'nama', 'golongan', 'kelompok'], success_url_name='master_akun_list', detail_url_name='master_akun_detail', hide_list_edit=True),
-    'jenis-transaksi': CrudConfig(model=TransactionType, form_class=TransactionTypeForm, title='Jenis Transaksi', list_display=['kode', 'nama', 'akun.kode', 'akun.nama'], list_labels={'kode': 'Kode', 'nama': 'Nama', 'akun.kode': 'Kode Akun', 'akun.nama': 'Nama Akun'}, search_fields=['kode', 'nama', 'akun__kode', 'akun__nama'], success_url_name='master_jenis_transaksi_list'),
-    'config': CrudConfig(model=TenantConfig, form_class=TenantConfigForm, title='Config', list_display=['kode', 'nilai', 'keterangan'], search_fields=['kode', 'nilai', 'keterangan'], success_url_name='master_config_list'),
 }
 
 urlpatterns = [

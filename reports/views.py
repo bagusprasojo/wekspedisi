@@ -131,17 +131,64 @@ def buku_besar(request):
 @login_required
 def neraca_saldo(request):
     require_tenant(request)
-    filters = report_filters(request)
-    rows = services.trial_balance(request.tenant, filters['end_date'])
+    filters = month_report_filters(request)
+    rows = services.trial_balance(request.tenant, filters['start_date'], filters['end_date'])
     if request.GET.get('export') in {'excel', 'pdf'}:
-        headers = ['Kode Akun', 'Akun', 'Saldo Normal', 'Debet', 'Kredit']
+        period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
+        headers = ['Kode', 'Nama Perkiraan', 'Pos', 'Saldo Awal Debet', 'Saldo Awal Kredit', 'Mutasi Debet', 'Mutasi Kredit', 'Saldo Akhir Debet', 'Saldo Akhir Kredit']
         export_rows = [
-            [row['account'].kode, row['account'].nama, row['account'].saldo_normal, row['debet'], row['kredit']]
-            for row in rows
+            [
+                (row['account'].kode, 'center'),
+                (row['account'].nama, 'text'),
+                (row['account'].saldo_normal, 'center'),
+                (row['sow_debet'], 'number'),
+                (row['sow_kredit'], 'number'),
+                (row['debet'], 'number'),
+                (row['kredit'], 'number'),
+                (row['akhir_debet'], 'number'),
+                (row['akhir_kredit'], 'number'),
+            ]
+            for index, row in enumerate(rows, start=1)
+        ]
+        totals = [
+            (0, 3, 'Total   ', 'text', 3),
+            (sum((r['sow_debet'] for r in rows), ZERO), 'number', 1),
+            (sum((r['sow_kredit'] for r in rows), ZERO), 'number', 1),
+            (sum((r['debet'] for r in rows), ZERO), 'number', 1),
+            (sum((r['kredit'] for r in rows), ZERO), 'number', 1),
+            (sum((r['akhir_debet'] for r in rows), ZERO), 'number', 1),
+            (sum((r['akhir_kredit'] for r in rows), ZERO), 'number', 1),
         ]
         if request.GET.get('export') == 'excel':
-            return excel_response('neraca-saldo.xls', 'Neraca Saldo', headers, export_rows, tenant=request.tenant, number_columns=[3, 4])
-        return pdf_response('neraca-saldo.pdf', 'Neraca Saldo', headers, export_rows, tenant=request.tenant, number_columns=[3, 4])
+            return legacy_report_excel_response(
+                'neraca-saldo.xls',
+                'Neraca Saldo',
+                request.tenant,
+                period,
+                headers,
+                export_rows,
+                totals,
+            )
+        return legacy_report_pdf_response(
+            'neraca-saldo.pdf',
+            'Neraca Saldo',
+            request.tenant,
+            period,
+            [
+                {'label': 'Kode', 'x': 0, 'w': 50, 'max': 8},
+                {'label': 'Nama Perkiraan', 'x': 50, 'w': 180, 'max': 30},
+                {'label': 'Pos', 'x': 230, 'w': 40, 'max': 6},
+                {'label': 'S.Awal (D)', 'x': 270, 'w': 75, 'max': 12},
+                {'label': 'S.Awal (K)', 'x': 345, 'w': 75, 'max': 12},
+                {'label': 'Mutasi (D)', 'x': 420, 'w': 75, 'max': 12},
+                {'label': 'Mutasi (K)', 'x': 495, 'w': 75, 'max': 12},
+                {'label': 'S.Akhir (D)', 'x': 570, 'w': 80, 'max': 12},
+                {'label': 'S.Akhir (K)', 'x': 650, 'w': 80, 'max': 12},
+            ],
+            export_rows,
+            totals,
+            landscape=True,
+        )
     return render(request, 'reports/neraca_saldo.html', {'title': 'Neraca Saldo', 'rows': rows, **filters})
 
 

@@ -72,30 +72,88 @@ def buku_besar(tenant, start_date=None, end_date=None, account=None):
     return rows
 
 
-def trial_balance(tenant, end_date=None):
-    cutoff = end_date or date.today()
-    rows = (
-        JournalLine.objects.filter(
-            tenant=tenant,
-            is_deleted=False,
-            journal__tenant=tenant,
-            journal__is_deleted=False,
-            journal__tanggal__lte=cutoff,
+def trial_balance(tenant, start_date=None, end_date=None):
+    end_cutoff = end_date or date.today()
+    sow_totals_by_account = {}
+    if start_date:
+        sow_rows = (
+            JournalLine.objects.filter(
+                tenant=tenant,
+                is_deleted=False,
+                journal__tenant=tenant,
+                journal__is_deleted=False,
+                journal__tanggal__lt=start_date,
+            )
+            .values('perkiraan')
+            .annotate(total_debet=Sum('debet'), total_kredit=Sum('kredit'))
         )
-        .values('perkiraan')
+        for row in sow_rows:
+            sow_totals_by_account[row['perkiraan']] = {
+                'debet': row['total_debet'] or ZERO,
+                'kredit': row['total_kredit'] or ZERO,
+            }
+
+    mutation_query = JournalLine.objects.filter(
+        tenant=tenant,
+        is_deleted=False,
+        journal__tenant=tenant,
+        journal__is_deleted=False,
+        journal__tanggal__lte=end_cutoff,
+    )
+    if start_date:
+        mutation_query = mutation_query.filter(journal__tanggal__gte=start_date)
+
+    mutation_rows = (
+        mutation_query.values('perkiraan')
         .annotate(total_debet=Sum('debet'), total_kredit=Sum('kredit'))
     )
-    totals_by_account = {
-        row['perkiraan']: {'debet': row['total_debet'] or ZERO, 'kredit': row['total_kredit'] or ZERO}
-        for row in rows
+    mutations_by_account = {
+        row['perkiraan']: {
+            'debet': row['total_debet'] or ZERO,
+            'kredit': row['total_kredit'] or ZERO,
+        }
+        for row in mutation_rows
     }
+
     result = []
     accounts = ChartOfAccount.objects.filter(tenant=tenant, is_deleted=False, is_active=True).order_by('kode')
     for account in accounts:
-        normal = normal_balance_amount(account, totals_by_account.get(account.pk, {'debet': ZERO, 'kredit': ZERO}))
-        if normal['debet'] == ZERO and normal['kredit'] == ZERO:
+        sow_raw = sow_totals_by_account.get(account.pk, {'debet': ZERO, 'kredit': ZERO})
+        mut_raw = mutations_by_account.get(account.pk, {'debet': ZERO, 'kredit': ZERO})
+
+        mut_debet = mut_raw['debet']
+        mut_kredit = mut_raw['kredit']
+
+        if account.saldo_normal == ChartOfAccount.NormalBalance.KREDIT:
+            sow_debet = ZERO
+            sow_kredit = sow_raw['kredit'] - sow_raw['debet']
+            akhir_debet = ZERO
+            akhir_kredit = sow_kredit + (mut_kredit - mut_debet)
+        else:
+            sow_debet = sow_raw['debet'] - sow_raw['kredit']
+            sow_kredit = ZERO
+            akhir_debet = sow_debet + (mut_debet - mut_kredit)
+            akhir_kredit = ZERO
+
+        if (
+            sow_debet == ZERO
+            and sow_kredit == ZERO
+            and mut_debet == ZERO
+            and mut_kredit == ZERO
+            and akhir_debet == ZERO
+            and akhir_kredit == ZERO
+        ):
             continue
-        result.append({'account': account, 'debet': normal['debet'], 'kredit': normal['kredit']})
+
+        result.append({
+            'account': account,
+            'sow_debet': sow_debet,
+            'sow_kredit': sow_kredit,
+            'debet': mut_debet,
+            'kredit': mut_kredit,
+            'akhir_debet': akhir_debet,
+            'akhir_kredit': akhir_kredit,
+        })
     return result
 
 

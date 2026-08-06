@@ -1,9 +1,12 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
-from tenants.forms import TenantAdmissionForm, TenantForm, TenantUserCreateForm
+from master.models import TenantConfig, TransactionType
+from tenants.forms import PlatformTenantConfigForm, PlatformTransactionTypeForm, TenantAdmissionForm, TenantForm, TenantUserCreateForm
 from tenants.models import Tenant
 from tenants.services import admit_tenant, create_tenant_user
 
@@ -82,3 +85,121 @@ def platform_tenant_user_create(request):
     else:
         form = TenantUserCreateForm()
     return render(request, 'platform/tenant_user_form.html', {'form': form})
+
+def platform_setting_queryset(model, request):
+    queryset = model.objects.filter(is_deleted=False).select_related('tenant')
+    if model is TransactionType:
+        queryset = queryset.select_related('akun')
+    tenant_id = request.GET.get('tenant', '').strip()
+    q = request.GET.get('q', '').strip()
+    if tenant_id:
+        queryset = queryset.filter(tenant_id=tenant_id)
+    if q:
+        if model is TenantConfig:
+            queryset = queryset.filter(Q(kode__icontains=q) | Q(nilai__icontains=q) | Q(keterangan__icontains=q))
+        else:
+            queryset = queryset.filter(Q(kode__icontains=q) | Q(nama__icontains=q) | Q(akun__kode__icontains=q) | Q(akun__nama__icontains=q))
+    return queryset.order_by('tenant__name', 'kode')
+
+@superadmin_required
+def platform_config_list(request):
+    rows = platform_setting_queryset(TenantConfig, request)
+    return render(
+        request,
+        'platform/config_list.html',
+        {
+            'title': 'Config Tenant',
+            'rows': rows,
+            'tenants': Tenant.objects.order_by('name'),
+            'selected_tenant': request.GET.get('tenant', ''),
+            'q': request.GET.get('q', ''),
+        },
+    )
+
+@superadmin_required
+def platform_config_create(request):
+    form = PlatformTenantConfigForm(request.POST or None, initial={'tenant': request.GET.get('tenant')})
+    if request.method == 'POST' and form.is_valid():
+        config = form.save(commit=False)
+        config.created_by = request.user
+        config.save()
+        messages.success(request, 'Config tenant berhasil disimpan.')
+        return redirect(reverse('platform_config_list'))
+    return render(request, 'platform/setting_form.html', {'title': 'Tambah Config Tenant', 'form': form, 'cancel_url': reverse('platform_config_list')})
+
+@superadmin_required
+def platform_config_edit(request, uuid):
+    config = get_object_or_404(TenantConfig, uuid=uuid, is_deleted=False)
+    form = PlatformTenantConfigForm(request.POST or None, instance=config)
+    if request.method == 'POST' and form.is_valid():
+        config = form.save(commit=False)
+        config.updated_by = request.user
+        config.save()
+        messages.success(request, 'Config tenant berhasil disimpan.')
+        return redirect(reverse('platform_config_list'))
+    return render(request, 'platform/setting_form.html', {'title': f'Edit Config {config.kode}', 'form': form, 'cancel_url': reverse('platform_config_list')})
+
+@superadmin_required
+def platform_config_delete(request, uuid):
+    config = get_object_or_404(TenantConfig, uuid=uuid, is_deleted=False)
+    if request.method == 'POST':
+        config.is_deleted = True
+        config.deleted_at = timezone.now()
+        config.deleted_by = request.user
+        config.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by', 'updated_at'])
+        messages.success(request, 'Config tenant berhasil dihapus.')
+        return redirect(reverse('platform_config_list'))
+    return render(request, 'platform/setting_confirm_delete.html', {'title': f'Hapus Config {config.kode}', 'object': config, 'cancel_url': reverse('platform_config_list')})
+
+@superadmin_required
+def platform_transaction_type_list(request):
+    rows = platform_setting_queryset(TransactionType, request)
+    return render(
+        request,
+        'platform/transaction_type_list.html',
+        {
+            'title': 'Jenis Transaksi',
+            'rows': rows,
+            'tenants': Tenant.objects.order_by('name'),
+            'selected_tenant': request.GET.get('tenant', ''),
+            'q': request.GET.get('q', ''),
+        },
+    )
+
+@superadmin_required
+def platform_transaction_type_create(request):
+    form = PlatformTransactionTypeForm(request.POST or None, initial={'tenant': request.GET.get('tenant')})
+    if request.method == 'POST' and form.is_valid():
+        transaction_type = form.save(commit=False)
+        transaction_type.created_by = request.user
+        transaction_type.save()
+        messages.success(request, 'Jenis transaksi berhasil disimpan.')
+        return redirect(reverse('platform_transaction_type_list'))
+    return render(request, 'platform/setting_form.html', {'title': 'Tambah Jenis Transaksi', 'form': form, 'cancel_url': reverse('platform_transaction_type_list')})
+
+@superadmin_required
+def platform_transaction_type_edit(request, uuid):
+    transaction_type = get_object_or_404(TransactionType, uuid=uuid, is_deleted=False)
+    form = PlatformTransactionTypeForm(request.POST or None, instance=transaction_type)
+    if request.method == 'POST' and form.is_valid():
+        transaction_type = form.save(commit=False)
+        transaction_type.updated_by = request.user
+        transaction_type.save()
+        messages.success(request, 'Jenis transaksi berhasil disimpan.')
+        return redirect(reverse('platform_transaction_type_list'))
+    return render(request, 'platform/setting_form.html', {'title': f'Edit Jenis Transaksi {transaction_type.kode}', 'form': form, 'cancel_url': reverse('platform_transaction_type_list')})
+
+@superadmin_required
+def platform_transaction_type_delete(request, uuid):
+    transaction_type = get_object_or_404(TransactionType, uuid=uuid, is_deleted=False)
+    if request.method == 'POST':
+        if transaction_type.bank_transactions.filter(is_deleted=False).exists():
+            messages.error(request, 'Jenis transaksi tidak bisa dihapus karena sudah dipakai transaksi.')
+            return redirect(reverse('platform_transaction_type_list'))
+        transaction_type.is_deleted = True
+        transaction_type.deleted_at = timezone.now()
+        transaction_type.deleted_by = request.user
+        transaction_type.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by', 'updated_at'])
+        messages.success(request, 'Jenis transaksi berhasil dihapus.')
+        return redirect(reverse('platform_transaction_type_list'))
+    return render(request, 'platform/setting_confirm_delete.html', {'title': f'Hapus Jenis Transaksi {transaction_type.kode}', 'object': transaction_type, 'cancel_url': reverse('platform_transaction_type_list')})

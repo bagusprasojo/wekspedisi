@@ -211,7 +211,7 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
             nilai_pekerjaan=Decimal('1000000'),
         )
 
-        with self.assertRaisesMessage(ValidationError, 'Konfigurasi invoice belum lengkap. Isi Config tenant: INVOICE_CODE.'):
+        with self.assertRaisesMessage(ValidationError, 'Konfigurasi invoice belum lengkap. Hubungi superadmin untuk melengkapi config tenant: INVOICE_CODE.'):
             invoice.save_with_business_rules(user=self.user)
 
     def test_invoice_pdf_requires_invoice_tenant_configs(self):
@@ -229,4 +229,4 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
         response = self.client.get(f'/invoice/invoice-customer/{invoice.uuid}/slip/')
 
         self.assertEqual(response.status_code, 400)
-        self.assertContains(response, 'Konfigurasi invoice belum lengkap. Isi Config tenant: INVOICE_PAYMENT_TEXT.', status_code=400)
+        self.assertContains(response, 'Konfigurasi invoice belum lengkap. Hubungi superadmin untuk melengkapi config tenant: INVOICE_PAYMENT_TEXT.', status_code=400)
