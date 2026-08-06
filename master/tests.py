@@ -158,3 +158,31 @@ class ArmadaDetailUxTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Detail Armada AD 1234 AB')
         self.assertContains(response, f'/master/armada/{self.armada.uuid}/edit/')
+
+class AccountDetailUxTests(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='CV Test')
+        self.user = get_user_model().objects.create_user(username='admin-akun')
+        UserProfile.objects.create(user=self.user, tenant=self.tenant, role=UserProfile.Role.ADMIN)
+        self.account = ChartOfAccount.objects.create(
+            tenant=self.tenant,
+            kode='501',
+            nama='Biaya Operasional',
+            golongan='Biaya',
+            kelompok='Operasional',
+            saldo_normal=ChartOfAccount.NormalBalance.DEBET,
+        )
+
+    def test_account_list_uses_detail_before_edit(self):
+        config = CONFIGS['akun']
+
+        self.assertEqual(config.detail_url_name, 'master_akun_detail')
+        self.assertTrue(config.hide_list_edit)
+
+    def test_account_detail_page_has_edit_button(self):
+        self.client.force_login(self.user)
+        response = self.client.get(f'/master/akun/{self.account.uuid}/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Detail Perkiraan/Akun 501')
+        self.assertContains(response, f'/master/akun/{self.account.uuid}/edit/')

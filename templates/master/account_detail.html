@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="rounded border bg-white p-4 text-sm">
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div><p class="text-slate-500">Kode</p><p class="font-semibold">{{ object.kode }}</p></div>
+            <div><p class="text-slate-500">Nama</p><p class="font-semibold">{{ object.nama }}</p></div>
+            <div><p class="text-slate-500">Saldo Normal</p><p class="font-semibold">{{ object.saldo_normal }}</p></div>
+            <div><p class="text-slate-500">Aktif?</p><p class="font-semibold">{{ object.is_active|yesno:"Ya,Tidak" }}</p></div>
+            <div><p class="text-slate-500">Golongan</p><p class="font-semibold">{{ object.golongan|default:"-" }}</p></div>
+            <div><p class="text-slate-500">Kelompok</p><p class="font-semibold">{{ object.kelompok|default:"-" }}</p></div>
+            <div><p class="text-slate-500">Level</p><p class="font-semibold">{{ object.level }}</p></div>
+            <div><p class="text-slate-500">Akun Parent</p><p class="font-semibold">{{ object.parent|default:"-" }}</p></div>
+        </div>
+    </div>
+
+    <div class="flex gap-2">
+        <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{{ cancel_url }}">Kembali</a>
+        <a class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" href="{% url 'master_akun_update' object.uuid %}">Edit</a>
+    </div>
+</div>
+{% endblock %}

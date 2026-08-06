@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
-from master.models import Armada, BankAccount, StakeHolder
+from master.models import Armada, BankAccount, ChartOfAccount, StakeHolder
 
 
 def require_tenant(request):
@@ -104,5 +104,22 @@ def armada_detail(request, uuid):
             'title': f'Detail Armada {armada.nopol}',
             'object': armada,
             'cancel_url': reverse('master_armada_list'),
+        },
+    )
+
+@login_required
+def account_detail(request, uuid):
+    require_tenant(request)
+    account = get_object_or_404(
+        ChartOfAccount.objects.filter(tenant=request.tenant, is_deleted=False).select_related('parent'),
+        uuid=uuid,
+    )
+    return render(
+        request,
+        'master/account_detail.html',
+        {
+            'title': f'Detail Perkiraan/Akun {account.kode}',
+            'object': account,
+            'cancel_url': reverse('master_akun_list'),
         },
     )
