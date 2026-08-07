@@ -1,35 +1,52 @@
 {% extends "base.html" %}
+{% load crud_extras %}
 
 {% block title %}{{ title }}{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
 
 {% block content %}
-{% include "reports/_filters.html" %}
 <form class="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-4" method="get">
-    <input name="start_date" type="hidden" value="{{ start_date|date:'Y-m-d' }}">
-    <input name="end_date" type="hidden" value="{{ end_date|date:'Y-m-d' }}">
-    <div class="min-w-72">
+    <div class="min-w-64">
         <label class="mb-1 block text-sm font-medium text-slate-700" for="account">Akun</label>
         <select class="w-full rounded border px-3 py-2 text-sm" id="account" name="account">
             <option value="">Semua akun</option>
             {% for account in accounts %}
-            <option value="{{ account.pk }}" {% if selected_account.pk == account.pk %}selected{% endif %}>{{ account }}</option>
+            <option value="{{ account.pk }}" {% if selected_account.pk == account.pk %}selected{% endif %}>{{ account.kode }} - {{ account.nama }}</option>
             {% endfor %}
         </select>
     </div>
-    <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Pilih Akun</button>
-    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="csv">Export CSV</button>
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="start_date">Tanggal Awal</label>
+        <input class="rounded border px-3 py-2 text-sm" id="start_date" name="start_date" type="date" value="{{ start_date|date:'Y-m-d' }}">
+    </div>
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="end_date">Tanggal Akhir</label>
+        <input class="rounded border px-3 py-2 text-sm" id="end_date" name="end_date" type="date" value="{{ end_date|date:'Y-m-d' }}">
+    </div>
+    <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Tampilkan</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="excel">Export Excel</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>
 </form>
+
 {% if selected_account %}
-<div class="mb-3 rounded border bg-white px-4 py-3 text-sm">Saldo awal: <strong>{{ opening }}</strong></div>
+<div class="mb-4 rounded border bg-white p-4 text-sm">
+    <div class="grid gap-3 md:grid-cols-4">
+        <div><p class="text-slate-500">Kode Akun</p><p class="font-semibold">{{ selected_account.kode }}</p></div>
+        <div><p class="text-slate-500">Nama Akun</p><p class="font-semibold">{{ selected_account.nama }}</p></div>
+        <div><p class="text-slate-500">Saldo Normal</p><p class="font-semibold">{{ selected_account.saldo_normal }}</p></div>
+        <div><p class="text-slate-500">Saldo Awal</p><p class="font-semibold">{{ opening|format_money }}</p></div>
+    </div>
+</div>
 {% endif %}
-<div class="overflow-hidden rounded border bg-white">
+
+<div class="overflow-x-auto overflow-hidden rounded border bg-white">
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-100 text-left text-slate-600">
             <tr>
                 <th class="px-4 py-3 font-medium">Tanggal</th>
                 <th class="px-4 py-3 font-medium">No Jurnal</th>
                 <th class="px-4 py-3 font-medium">Keterangan</th>
+                <th class="px-4 py-3 font-medium">Kode Akun</th>
                 <th class="px-4 py-3 font-medium">Akun</th>
                 <th class="px-4 py-3 text-right font-medium">Debet</th>
                 <th class="px-4 py-3 text-right font-medium">Kredit</th>
@@ -38,19 +55,30 @@
         </thead>
         <tbody class="divide-y divide-slate-100">
             {% for row in rows %}
-            <tr>
-                <td class="px-4 py-3">{{ row.line.journal.tanggal }}</td>
-                <td class="px-4 py-3">{{ row.line.journal.no_jurnal }}</td>
-                <td class="px-4 py-3">{{ row.line.journal.keterangan }}</td>
-                <td class="px-4 py-3">{{ row.line.perkiraan }}</td>
-                <td class="px-4 py-3 text-right">{{ row.line.debet }}</td>
-                <td class="px-4 py-3 text-right">{{ row.line.kredit }}</td>
-                <td class="px-4 py-3 text-right">{{ row.saldo|default:"" }}</td>
+            <tr class="hover:bg-slate-50">
+                <td class="whitespace-nowrap px-4 py-3">{{ row.line.journal.tanggal|date:"d/m/Y" }}</td>
+                <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ row.line.journal.no_jurnal }}</td>
+                <td class="whitespace-nowrap px-4 py-3">{{ row.line.journal.keterangan }}</td>
+                <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ row.line.perkiraan.kode }}</td>
+                <td class="whitespace-nowrap px-4 py-3">{{ row.line.perkiraan.nama }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right">{{ row.line.debet|format_money }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right">{{ row.line.kredit|format_money }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-medium">{% if row.saldo != None %}{{ row.saldo|format_money }}{% else %}-{% endif %}</td>
             </tr>
             {% empty %}
-            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="7">Belum ada data.</td></tr>
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="8">Belum ada data.</td></tr>
             {% endfor %}
         </tbody>
+        {% if rows %}
+        <tfoot class="border-t-2 border-slate-300 bg-slate-50 font-semibold">
+            <tr>
+                <td class="px-4 py-3 text-right" colspan="5">Total Mutasi</td>
+                <td class="px-4 py-3 text-right">{{ rows|sum_attr:'line.debet' }}</td>
+                <td class="px-4 py-3 text-right">{{ rows|sum_attr:'line.kredit' }}</td>
+                <td class="px-4 py-3"></td>
+            </tr>
+        </tfoot>
+        {% endif %}
     </table>
 </div>
 {% endblock %}

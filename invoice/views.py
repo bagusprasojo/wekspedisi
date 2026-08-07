@@ -64,31 +64,27 @@ def _base_pdf_html(tenant, body, landscape=False):
 <style>
 @page {{ size: {page_size}; margin: 12mm 10mm; }}
 body {{ font-family: Arial, sans-serif; font-size: 9pt; color: #000; }}
-.company-header {{ display:grid; grid-template-columns:70px 1fr 135px; gap:10px; align-items:start; margin-bottom:18px; }}
+.company-header {{ display:grid; grid-template-columns:70px 1fr 135px; gap:10px; align-items:start; margin-bottom:12px; border-bottom:1px solid #000; padding-bottom:6px; }}
 .logo {{ width:65px; height:60px; object-fit:contain; }}
 .company {{ font-size:19pt; font-weight:700; line-height:1; margin-bottom:3px; }}
 .doc-date {{ text-align:right; }}
 .box {{ border:1px solid #000; }}
-.grid {{ display:grid; gap:10px; }}
-.two {{ grid-template-columns:1fr 196px; }}
-.invoice-title {{ font-size:20pt; font-weight:700; text-align:center; border-bottom:1px solid #000; padding:7px 0; }}
+.grid {{ display:grid; gap:12px; }}
+.two {{ grid-template-columns:1fr 210px; }}
+.invoice-title {{ font-size:20pt; font-weight:700; text-align:center; border-bottom:1px solid #000; padding:6px 0; font-family:Verdana, sans-serif; }}
 .pad {{ padding:10px; }}
 .right {{ text-align:right; }}
 .center {{ text-align:center; }}
 .bold {{ font-weight:700; }}
-.money-table {{ width:100%; border-collapse:collapse; }}
-.money-table td {{ padding:4px 0; }}
-.detail {{ min-height:370px; position:relative; padding:12px; }}
-.amounts {{ position:absolute; right:0; top:0; width:146px; height:189px; border-left:1px solid #000; border-bottom:1px solid #000; padding:12px 6px; }}
-.amount-row {{ display:grid; grid-template-columns:1fr 22px 1fr; margin-bottom:10px; }}
-.footer-pay {{ position:absolute; left:12px; bottom:12px; width:270px; }}
-.sign {{ position:absolute; right:30px; bottom:12px; width:190px; text-align:center; }}
-.receipt-page {{ border:1px solid #000; padding:12px 12px 20px; min-height:430px; }}
-.receipt-title {{ border:1px solid #000; font-size:20pt; font-weight:700; text-align:center; padding:8px; margin-left:75px; }}
-.receipt-body {{ border:1px solid #000; margin:12px 0 0 70px; padding:18px 14px; min-height:340px; }}
-.receipt-row {{ display:grid; grid-template-columns:130px 18px 1fr; gap:4px; margin-bottom:14px; font-size:11pt; }}
-.receipt-box {{ border:1px solid #000; padding:6px; font-weight:700; }}
-.receipt-total {{ border-top:1px solid #000; border-bottom:1px solid #000; display:flex; justify-content:space-between; width:310px; padding:12px 0; font-size:16pt; margin-top:20px; }}
+.detail {{ min-height:480px; position:relative; padding:14px; margin-top:14px; }}
+.top-amount-box {{ position:absolute; right:0; top:0; width:160px; height:80px; border-left:1px solid #000; border-bottom:1px solid #000; padding:10px; display:flex; justify-content:space-between; align-items:flex-start; }}
+.summary-panel {{ position:absolute; right:14px; top:130px; width:280px; }}
+.summary-row {{ display:grid; grid-template-columns:100px 24px 1fr; line-height:22px; align-items:center; }}
+.summary-row.total-row {{ font-weight:700; border-top:1px solid #000; padding-top:4px; margin-top:6px; }}
+.terbilang-box {{ position:absolute; left:14px; top:230px; width:calc(100% - 310px); }}
+.footer-pay {{ position:absolute; left:14px; bottom:16px; width:300px; }}
+.sign {{ position:absolute; right:20px; bottom:16px; width:220px; text-align:center; line-height:20px; }}
+.sign .name-line {{ display:inline-block; border-bottom:1px solid #000; min-width:140px; margin-top:40px; font-weight:600; }}
 </style></head><body>{body}</body></html>'''
 
 
@@ -133,51 +129,17 @@ def customer_invoice_slip(request, uuid):
     dpp = (invoice.nilai_pekerjaan * Decimal('11') / Decimal('12')).quantize(Decimal('0.01'))
     payment_text = get_config_value(request.tenant, 'INVOICE_PAYMENT_TEXT')
     admin_name = get_config_value(request.tenant, 'INVOICE_ADMIN_NAME')
-    pekerjaan = '<br>'.join(escape(line) for line in _wrapped(invoice.pekerjaan, 62)[:2])
-    terbilang = '<br>'.join(escape(line) for line in _wrapped(invoice.terbilang, 48)[:2])
-    payment_lines = '<br>'.join(escape(line) for line in str(payment_text).splitlines()[:2])
-    body = f'''
-{_company_header_html(request.tenant)}
-<div class="grid two">
-<div class="box pad">
-<div>Kepada</div>
-<div class="bold" style="font-size:10pt;margin-top:8px">{escape(str(invoice.customer.nama or ""))}</div>
-<div style="margin-top:8px">{escape(str(invoice.customer.alamat or ""))}</div>
-</div>
-<div class="box">
-<div class="invoice-title">Invoice</div>
-<div class="pad">
-<div>No Invoice : {escape(invoice.no_invoice)}</div>
-<div style="margin-top:10px">Tanggal : {escape(_date_id(invoice.tanggal))}</div>
-</div>
-</div>
-</div>
-<div class="box detail" style="margin-top:74px">
-<div>{pekerjaan}</div>
-<div class="right" style="margin-right:153px;margin-top:-15px">Rp&nbsp;&nbsp;{escape(_money(invoice.nilai_pekerjaan))}</div>
-<div class="amounts">
-<div class="amount-row"><span>Sub Total</span><span>Rp</span><span class="right">{escape(_money(invoice.nilai_pekerjaan))}</span></div>
-<div class="amount-row"><span>DPP</span><span>Rp</span><span class="right">{escape(_money(dpp))}</span></div>
-<div class="amount-row"><span>PPN 12%</span><span>Rp</span><span class="right">{escape(_money(invoice.ppn))}</span></div>
-<div style="border-top:1px solid #000;margin:12px -6px 14px"></div>
-<div class="amount-row bold"><span>Total</span><span>Rp</span><span class="right">{escape(_money(invoice.total))}</span></div>
-</div>
-<div style="position:absolute;left:12px;top:178px">
-<div>Terbilag :</div>
-<div class="bold" style="font-size:10pt;margin-top:10px">{terbilang}</div>
-</div>
-<div class="footer-pay">
-<div>Pembayaran Melalui :</div>
-<div style="margin-top:10px">{payment_lines}</div>
-</div>
-<div class="sign">
-<div>Sukoharjo, {escape(_date_id(invoice.tanggal))}</div>
-<div style="margin-top:14px">{escape(str(request.tenant.name or ""))}</div>
-<div style="margin-top:46px;border-bottom:1px solid #000">{escape(str(admin_name))}</div>
-<div>Admin</div>
-</div>
-</div>'''
-    return _weasy_response(f'invoice-{invoice.no_invoice}.pdf', _base_pdf_html(request.tenant, body), inline=True)
+    return render(
+        request,
+        'invoice/customer_invoice_slip.html',
+        {
+            'object': invoice,
+            'dpp': dpp,
+            'payment_text': payment_text,
+            'admin_name': admin_name,
+            'tenant': request.tenant,
+        },
+    )
 
 @login_required
 def customer_invoice_receipt(request, uuid):

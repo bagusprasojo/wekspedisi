@@ -9,7 +9,7 @@
     <style>
         @page {
             size: A4;
-            margin: 12mm;
+            margin: 12mm 10mm;
         }
 
         * {
@@ -35,6 +35,7 @@
             color: #fff;
             padding: 7px 14px;
             cursor: pointer;
+            border-radius: 4px;
         }
 
         .page {
@@ -42,13 +43,12 @@
             min-height: 297mm;
             margin: 0 auto;
             background: #fff;
-            padding: 12mm;
+            padding: 12mm 10mm;
         }
 
         .sheet {
             width: 100%;
             margin: 0 auto;
-            padding-top: 0;
         }
 
         .top-date {
@@ -56,13 +56,16 @@
             justify-content: flex-end;
             gap: 4px;
             font-size: 11px;
+            margin-bottom: 4px;
         }
 
         .header {
             display: grid;
-            grid-template-columns: 65px minmax(0, 1fr) 220px;
-            gap: 0;
-            margin-top: 2px;
+            grid-template-columns: 65px minmax(0, 1fr) 230px;
+            gap: 12px;
+            align-items: start;
+            border-bottom: 1px solid #000;
+            padding-bottom: 8px;
         }
 
         .logo {
@@ -81,6 +84,41 @@
             line-height: 15px;
         }
 
+        .two-cols {
+            display: grid;
+            grid-template-columns: 1fr 250px;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .box {
+            border: 1px solid #000;
+        }
+
+        .customer-box {
+            padding: 10px;
+            min-height: 85px;
+        }
+
+        .customer-label {
+            margin-bottom: 4px;
+            font-size: 11px;
+            color: #333;
+        }
+
+        .customer-name {
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .customer-address {
+            margin-top: 4px;
+            line-height: 1.4;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+        }
+
         .invoice-title {
             height: 30px;
             border-bottom: 1px solid #000;
@@ -93,130 +131,135 @@
 
         .invoice-meta {
             display: grid;
-            grid-template-columns: 58px 12px 1fr;
-            margin-top: 8px;
-            line-height: 17px;
-        }
-
-        .customer-box {
-            margin-top: 18px;
-            width: 55%;
-            border: 1px solid #000;
+            grid-template-columns: 75px 12px 1fr;
             padding: 8px 10px;
-            min-height: 70px;
-        }
-
-        .customer-label {
-            margin-bottom: 8px;
-        }
-
-        .customer-name {
-            font-weight: 700;
+            line-height: 20px;
         }
 
         .body-box {
             position: relative;
-            margin-top: 16px;
+            margin-top: 14px;
             width: 100%;
-            height: 399px;
+            min-height: 480px;
             border: 1px solid #000;
+            padding: 14px;
         }
 
-        .job {
-            position: absolute;
-            left: 10px;
-            top: 10px;
-            width: calc(100% - 240px);
+        .job-desc {
+            width: calc(100% - 175px);
             white-space: pre-line;
+            line-height: 1.4;
         }
 
-        .summary-labels {
-            position: absolute;
-            right: 150px;
-            top: 80px;
-            width: 148px;
-            line-height: 20px;
-        }
-
-        .amount-box {
+        .top-amount-box {
             position: absolute;
             right: 0;
             top: 0;
-            width: 146px;
-            height: 189px;
+            width: 160px;
+            height: 80px;
             border-left: 1px solid #000;
             border-bottom: 1px solid #000;
-            padding: 9px 6px;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            font-weight: 700;
         }
 
-        .amount-line {
-            display: grid;
-            grid-template-columns: 28px 1fr;
-            align-items: center;
-            line-height: 20px;
+        .summary-section {
+            position: absolute;
+            right: 0;
+            top: 120px;
+            display: flex;
+            align-items: stretch;
         }
 
-        .amount-line .value {
+        .summary-labels {
+            width: 120px;
+            padding-right: 14px;
             text-align: right;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding-top: 6px;
+            padding-bottom: 6px;
         }
 
-        .amount-separator {
+        .summary-labels div {
+            line-height: 22px;
+        }
+
+        .summary-box {
+            width: 160px;
+            border-left: 1px solid #000;
+            border-bottom: 1px solid #000;
             border-top: 1px solid #000;
-            margin: 37px -3px 3px;
+            padding: 6px 10px;
         }
 
-        .amount-gap {
-            height: 20px;
+        .summary-line {
+            display: flex;
+            justify-content: space-between;
+            line-height: 22px;
+        }
+
+        .summary-line.total-line {
+            font-weight: 700;
+            border-top: 1px solid #000;
+            margin-top: 4px;
+            padding-top: 4px;
+        }
+
+        .terbilang-box {
+            position: absolute;
+            left: 14px;
+            top: 230px;
+            width: calc(100% - 310px);
         }
 
         .terbilang-label {
-            position: absolute;
-            left: 10px;
-            top: 189px;
-            width: 90px;
+            font-weight: 600;
+            margin-bottom: 2px;
         }
 
         .terbilang {
-            position: absolute;
-            left: 10px;
-            top: 210px;
-            width: 299px;
             font-weight: 700;
             font-style: italic;
             line-height: 18px;
         }
 
-        .payment-label {
+        .footer-pay {
             position: absolute;
-            left: 10px;
-            top: 339px;
-            width: 179px;
+            left: 14px;
+            bottom: 16px;
+            width: 300px;
+        }
+
+        .payment-label {
+            font-weight: 600;
+            margin-bottom: 4px;
         }
 
         .payment-text {
-            position: absolute;
-            left: 10px;
-            top: 360px;
-            width: 309px;
             white-space: pre-line;
-            line-height: 15px;
+            line-height: 16px;
         }
 
         .signature {
             position: absolute;
-            right: 12px;
-            top: 250px;
-            width: 214px;
+            right: 20px;
+            bottom: 16px;
+            width: 220px;
             text-align: center;
             line-height: 20px;
         }
 
         .signature .name {
             display: inline-block;
-            margin-top: 50px;
+            margin-top: 40px;
             border-bottom: 1px solid #000;
-            min-width: 99px;
-            line-height: 19px;
+            min-width: 140px;
+            font-weight: 600;
         }
 
         @media print {
@@ -251,57 +294,65 @@
                 <img class="logo" src="{% static 'reports/logo.png' %}" alt="">
                 <div>
                     <div class="company-name">{{ tenant.name }}</div>
-                    <div class="company-line">Office : {{ tenant.address }}{% if tenant.city %}, Kabupaten {{
-                        tenant.city }}{% endif %}</div>
-                    <div class="company-line">{{ tenant.postal_code }}{% if tenant.province %}, {{ tenant.province }}{%
-                        endif %}</div>
+                    <div class="company-line">Office : {{ tenant.address }}{% if tenant.city %}, Kabupaten {{ tenant.city }}{% endif %}</div>
+                    <div class="company-line">{{ tenant.postal_code }}{% if tenant.province %}, {{ tenant.province }}{% endif %}</div>
                 </div>
-                <div>
+                <div></div>
+            </header>
+
+            <div class="two-cols">
+                <section class="box customer-box">
+                    <div class="customer-label">Kepada</div>
+                    <div class="customer-name">{{ object.customer.nama }}</div>
+                    <div class="customer-address">{{ object.customer.alamat }}</div>
+                </section>
+                <section class="box">
                     <div class="invoice-title">Invoice</div>
                     <div class="invoice-meta">
-                        <span>:</span><span>{{ object.no_invoice }}</span>
+                        <span>No Invoice</span><span>:</span><span>{{ object.no_invoice }}</span>
                         <span>Tanggal</span><span>:</span><span>{{ object.tanggal|date:"d F Y" }}</span>
                     </div>
-                </div>
-            </header>
-            <section class="customer-box">
-                <div class="customer-label">Kepada</div>
-                <div class="customer-name">{{ object.customer.nama }}</div>
-                <div>{{ object.customer.alamat|linebreaksbr }}</div>
-            </section>
+                </section>
+            </div>
+
             <section class="body-box">
-                <div class="job">{{ object.pekerjaan }}</div>
-                <div class="summary-labels">
-                    <div>Sub Total</div>
-                    <div>DPP</div>
-                    <div>PPN 11%</div>
-                    <div class="amount-gap"></div>
-                    <div>Total</div>
+                <div class="job-desc">{{ object.pekerjaan }}</div>
+
+                <div class="top-amount-box">
+                    <span>Rp</span><span>{{ object.nilai_pekerjaan|format_money }}</span>
                 </div>
-                <div class="amount-box">
-                    <div class="amount-line"><span>Rp</span><span class="value">{{ object.nilai_pekerjaan|format_money
-                            }}</span></div>
-                    <div class="amount-separator"></div>
-                    <div class="amount-line"><span>Rp</span><span class="value">{{ object.nilai_pekerjaan|format_money
-                            }}</span></div>
-                    <div class="amount-line"><span>Rp</span><span class="value">{{ dpp|format_money_integer }}</span>
+
+                <div class="summary-section">
+                    <div class="summary-labels">
+                        <div>Sub Total</div>
+                        <div>DPP</div>
+                        <div>PPN {{ object.ppn_persen }}%</div>
+                        <div style="font-weight:700;margin-top:6px;">Total</div>
                     </div>
-                    <div class="amount-line"><span>Rp</span><span class="value">{{ object.ppn|format_money }}</span>
-                    </div>
-                    <div class="amount-gap"></div>
-                    <div class="amount-line"><span>Rp</span><span class="value">{{ object.total|format_money }}</span>
+                    <div class="summary-box">
+                        <div class="summary-line"><span>Rp</span><span>{{ object.nilai_pekerjaan|format_money }}</span></div>
+                        <div class="summary-line"><span>Rp</span><span>{{ dpp|format_money_integer }}</span></div>
+                        <div class="summary-line"><span>Rp</span><span>{{ object.ppn|format_money }}</span></div>
+                        <div class="summary-line total-line"><span>Rp</span><span>{{ object.total|format_money }}</span></div>
                     </div>
                 </div>
-                <div class="terbilang-label">Terbilang :</div>
-                <div class="terbilang">{{ object.terbilang }}</div>
-                <div class="payment-label">Pembayaran Melalui :</div>
-                <div class="payment-text">Transfer Bank Mandiri No Rek. 138.002.2313964
-                    CV. Tampir Baru Logistik</div>
+
+                <div class="terbilang-box">
+                    <div class="terbilang-label">Terbilang :</div>
+                    <div class="terbilang">{{ object.terbilang }}</div>
+                </div>
+
+                <div class="footer-pay">
+                    <div class="payment-label">Pembayaran Melalui :</div>
+                    <div class="payment-text">Transfer Bank Mandiri No Rek. 138.002.2313964
+CV. Tampir Baru Logistik</div>
+                </div>
+
                 <div class="signature">
                     <div>Sukoharjo, {{ object.tanggal|date:"d F Y" }}</div>
-                    <div>PT. Tampir Baru Logistik</div>
-                    <div class="name">Lia Wahyuningsih</div>
-                    <div>Admin</div>
+                    <div>{{ tenant.name }}</div>
+                    <div><span class="name">{% if admin_name %}{{ admin_name }}{% elif object.created_by %}{{ object.created_by.username }}{% else %}Admin{% endif %}</span></div>
+                    <div style="margin-top:3px;">Admin</div>
                 </div>
             </section>
         </section>

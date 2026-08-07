@@ -42,15 +42,15 @@
         <tbody class="divide-y divide-slate-100">
             {% for row in rows %}
             <tr class="hover:bg-slate-50">
-                <td class="px-4 py-2.5 font-mono text-xs">{{ row.account.kode }}</td>
-                <td class="px-4 py-2.5">{{ row.account.nama }}</td>
-                <td class="px-4 py-2.5 text-center text-xs font-semibold">{{ row.account.saldo_normal }}</td>
-                <td class="px-4 py-2.5 text-right">{{ row.sow_debet|format_money }}</td>
-                <td class="px-4 py-2.5 text-right">{{ row.sow_kredit|format_money }}</td>
-                <td class="px-4 py-2.5 text-right">{{ row.debet|format_money }}</td>
-                <td class="px-4 py-2.5 text-right">{{ row.kredit|format_money }}</td>
-                <td class="px-4 py-2.5 text-right">{{ row.akhir_debet|format_money }}</td>
-                <td class="px-4 py-2.5 text-right">{{ row.akhir_kredit|format_money }}</td>
+                <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs">{{ row.account.kode }}</td>
+                <td class="whitespace-nowrap px-4 py-2.5">{{ row.account.nama }}</td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-center text-xs font-semibold">{{ row.account.saldo_normal }}</td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-right">{{ row.sow_debet|format_money }}</td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-right">{{ row.sow_kredit|format_money }}</td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-right">{{ row.debet|format_money }}</td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-right">{{ row.kredit|format_money }}</td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-right">{{ row.akhir_debet|format_money }}</td>
+                <td class="whitespace-nowrap px-4 py-2.5 text-right">{{ row.akhir_kredit|format_money }}</td>
             </tr>
             {% empty %}
             <tr><td class="px-4 py-6 text-center text-slate-500" colspan="9">Belum ada data.</td></tr>

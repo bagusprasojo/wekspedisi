@@ -346,11 +346,22 @@ def legacy_report_pdf_response(filename, title, tenant, period, columns, rows, t
         col_widths=[col['w'] for col in columns],
     )
     body += f'''
-<table class="sign">
-<tr><td colspan="4" class="date-line">Kab. Sukoharjo, {escape(_print_datetime_id())}</td></tr>
-<tr><td></td><td>Mengetahui,</td><td></td><td>Yang membuat</td></tr>
-<tr><td colspan="4" style="height:46px"></td></tr>
-<tr><td></td><td style="border-bottom:1px solid #000">-</td><td></td><td style="border-bottom:1px solid #000">{escape(admin_name)}</td></tr>
-<tr><td></td><td><strong>Manager Operasional</strong></td><td></td><td><strong>Admin</strong></td></tr>
+<table class="sign" style="width:100%; margin-top:28px; border-collapse:collapse;">
+<tr>
+  <td style="width:50%; text-align:center; vertical-align:top; border:0;">
+    <div style="height:18px;"></div>
+    <div>Mengetahui,</div>
+    <div style="height:46px;"></div>
+    <div><span style="display:inline-block; width:150px; border-bottom:1px solid #000;">&nbsp;</span></div>
+    <div style="margin-top:4px;"><strong>Manager Operasional</strong></div>
+  </td>
+  <td style="width:50%; text-align:center; vertical-align:top; border:0;">
+    <div style="height:18px;">Kab. Sukoharjo, {escape(_print_datetime_id())}</div>
+    <div>Yang membuat</div>
+    <div style="height:46px;"></div>
+    <div><span style="display:inline-block; width:150px; border-bottom:1px solid #000;">{escape(admin_name)}</span></div>
+    <div style="margin-top:4px;"><strong>Admin</strong></div>
+  </td>
+</tr>
 </table>'''
     return _weasy_response(filename, _pdf_html_document(title, tenant, body, landscape=landscape))

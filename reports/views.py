@@ -5,15 +5,14 @@ from decimal import Decimal
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Sum
+from django.db.models import Exists, OuterRef, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 
 from accounting.models import Journal
 from core.exporters import excel_response, legacy_report_excel_response, legacy_report_pdf_response, pdf_response
 from core.templatetags.crud_extras import format_money
-from master.models import Armada, BankAccount
-from master.models import ChartOfAccount
+from master.models import Armada, BankAccount, ChartOfAccount
 from reports import services
 
 ZERO = Decimal('0')
@@ -40,6 +39,7 @@ def report_filters(request):
         'start_date': parse_date(request.GET.get('start_date')),
         'end_date': parse_date(request.GET.get('end_date')),
     }
+
 
 def month_report_filters(request):
     today = date.today()
@@ -111,21 +111,92 @@ def daftar_jurnal_detail(request, uuid):
 @login_required
 def buku_besar(request):
     require_tenant(request)
-    filters = report_filters(request)
-    accounts = ChartOfAccount.objects.filter(tenant=request.tenant, is_deleted=False, is_active=True).order_by('kode')
+    filters = month_report_filters(request)
+    child_accounts = ChartOfAccount.objects.filter(tenant=request.tenant, is_deleted=False, parent=OuterRef('pk'))
+    accounts = (
+        ChartOfAccount.objects.filter(tenant=request.tenant, is_deleted=False, is_active=True)
+        .annotate(has_children=Exists(child_accounts))
+        .filter(has_children=False)
+        .order_by('kode')
+    )
     account = None
     account_id = request.GET.get('account')
     if account_id:
         account = accounts.filter(pk=account_id).first()
     rows = services.buku_besar(request.tenant, filters['start_date'], filters['end_date'], account=account)
-    opening = services.opening_balance(request.tenant, account, filters['start_date']) if account else None
-    if request.GET.get('export') == 'csv':
-        csv_rows = [
-            [row['line'].journal.tanggal, row['line'].journal.no_jurnal, row['line'].journal.keterangan, row['line'].perkiraan.kode, row['line'].perkiraan.nama, row['line'].debet, row['line'].kredit, row['saldo'] or '']
+    opening = services.opening_balance(request.tenant, account, filters['start_date']) if account else ZERO
+
+    if request.GET.get('export') in {'excel', 'pdf'}:
+        period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
+        extra_lines = []
+        if account:
+            extra_lines = [
+                f'Kode Akun : {account.kode}     Nama Akun : {account.nama}',
+                f'Saldo Normal : {account.saldo_normal}     Saldo Awal : {format_money(opening)}',
+            ]
+        headers = ['Tanggal', 'No Jurnal', 'Keterangan', 'Kode Akun', 'Akun', 'Debet', 'Kredit', 'Saldo']
+        export_rows = [
+            [
+                (row['line'].journal.tanggal.strftime('%d/%m/%Y'), 'center'),
+                (row['line'].journal.no_jurnal, 'center'),
+                (row['line'].journal.keterangan, 'text'),
+                (row['line'].perkiraan.kode, 'center'),
+                (row['line'].perkiraan.nama, 'text'),
+                (row['line'].debet, 'number'),
+                (row['line'].kredit, 'number'),
+                (row['saldo'] if row['saldo'] is not None else '', 'number'),
+            ]
             for row in rows
         ]
-        return csv_response('buku-besar.csv', ['Tanggal', 'No Jurnal', 'Keterangan', 'Kode Akun', 'Akun', 'Debet', 'Kredit', 'Saldo'], csv_rows)
-    return render(request, 'reports/buku_besar.html', {'title': 'Buku Besar', 'accounts': accounts, 'selected_account': account, 'opening': opening, 'rows': rows, **filters})
+        totals = [
+            (0, 5, 'Total   ', 'text', 5),
+            (sum((row['line'].debet for row in rows), ZERO), 'number', 1),
+            (sum((row['line'].kredit for row in rows), ZERO), 'number', 1),
+            ('', 'text', 1),
+        ]
+        if request.GET.get('export') == 'excel':
+            return legacy_report_excel_response(
+                'buku-besar.xls',
+                'Buku Besar',
+                request.tenant,
+                period,
+                headers,
+                export_rows,
+                totals,
+                extra_lines=extra_lines,
+            )
+        return legacy_report_pdf_response(
+            'buku-besar.pdf',
+            'Buku Besar',
+            request.tenant,
+            period,
+            [
+                {'label': 'Tanggal', 'x': 0, 'w': 60, 'max': 8},
+                {'label': 'No Jurnal', 'x': 60, 'w': 80, 'max': 12},
+                {'label': 'Keterangan', 'x': 140, 'w': 220, 'max': 40},
+                {'label': 'Kode', 'x': 360, 'w': 50, 'max': 8},
+                {'label': 'Akun', 'x': 410, 'w': 140, 'max': 25},
+                {'label': 'Debet', 'x': 550, 'w': 80, 'max': 12},
+                {'label': 'Kredit', 'x': 630, 'w': 80, 'max': 12},
+                {'label': 'Saldo', 'x': 710, 'w': 90, 'max': 12},
+            ],
+            export_rows,
+            totals,
+            extra_lines=extra_lines,
+            landscape=True,
+        )
+    return render(
+        request,
+        'reports/buku_besar.html',
+        {
+            'title': 'Buku Besar',
+            'accounts': accounts,
+            'selected_account': account,
+            'opening': opening,
+            'rows': rows,
+            **filters,
+        },
+    )
 
 
 @login_required
