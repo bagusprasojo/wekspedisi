@@ -66,7 +66,7 @@ No Invoice : {{ object.no_invoice }}</div>
                 <div class="signature">
                     <div>Sukoharjo, {{ object.tanggal|date:"d F Y" }}</div>
                     <div>{{ tenant.name }}</div>
-                    <div class="name">Lia Wahyuningsih</div>
+                    <div class="name">{% if admin_name %}{{ admin_name }}{% elif object.created_by %}{{ object.created_by.username }}{% else %}Lia Wahyuningsih{% endif %}</div>
                 </div>
                 <div class="amount-box">
                     <div class="amount-label">Terbilang Rp</div>

@@ -154,38 +154,16 @@ def customer_invoice_receipt(request, uuid):
     )
     no_kwitansi = invoice.no_invoice.replace('INV', 'KWI')
     admin_name = get_config_value(request.tenant, 'INVOICE_ADMIN_NAME')
-    receipt_rows = [
-        ('Nomor', no_kwitansi, False),
-        ('Telah terima dari', invoice.customer.nama, False),
-        ('Uang sejumlah', invoice.terbilang, True),
-        ('Untuk pembayaran', f'{invoice.pekerjaan}\nNo Invoice : {invoice.no_invoice}', True),
-    ]
-    rows_html = []
-    for label, value, boxed in receipt_rows:
-        value_html = '<br>'.join(escape(line) for line in _wrapped(value, 60)[:4])
-        if boxed:
-            value_html = f'<div class="receipt-box">{value_html}</div>'
-        else:
-            value_html = f'<div class="bold">{value_html}</div>'
-        rows_html.append(f'<div class="receipt-row"><div>{escape(label)}</div><div>:</div>{value_html}</div>')
-    body = f'''
-<div class="receipt-page">
-<div class="receipt-title">KWITANSI</div>
-<div class="receipt-body">
-{''.join(rows_html)}
-<div style="display:grid;grid-template-columns:1fr 210px;gap:20px;margin-top:18px">
-<div>
-<div class="receipt-total"><span>Terbilang Rp</span><strong>{escape(_money(invoice.total))}</strong></div>
-</div>
-<div class="center bold">
-<div>Sukoharjo, {escape(_date_id(invoice.tanggal))}</div>
-<div style="margin-top:16px">{escape(str(request.tenant.name or ""))}</div>
-<div style="margin-top:70px;border-bottom:1px solid #000">{escape(str(admin_name))}</div>
-</div>
-</div>
-</div>
-</div>'''
-    return _weasy_response(f'kwitansi-{no_kwitansi}.pdf', _base_pdf_html(request.tenant, body, landscape=True), inline=True)
+    return render(
+        request,
+        'invoice/customer_invoice_receipt.html',
+        {
+            'object': invoice,
+            'no_kwitansi': no_kwitansi,
+            'admin_name': admin_name,
+            'tenant': request.tenant,
+        },
+    )
 
 @login_required
 def customer_invoice_payment_receipt(request, uuid):
