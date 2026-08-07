@@ -196,7 +196,11 @@ def legacy_report_excel_response(filename, title, tenant, period, headers, rows,
                 cell.number_format = '#,##0.##'
         row_no += 1
     col = 1
-    for value, kind, span in totals:
+    for item in totals:
+        if len(item) == 5:
+            _, _, value, kind, span = item
+        else:
+            value, kind, span = item
         if span > 1:
             ws.merge_cells(start_row=row_no, start_column=col, end_row=row_no, end_column=col + span - 1)
         cell = ws.cell(row_no, col, value if kind == 'number' else _text(value))

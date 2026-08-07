@@ -202,6 +202,31 @@ class ReportLayoutTests(TestCase):
         self.assertContains(response, '>0<')
         self.assertNotContains(response, '1.250.000,00')
 
+    def test_neraca_saldo_export_excel_success(self):
+        tenant = Tenant.objects.create(name='CV Test')
+        user = get_user_model().objects.create_user(username='admin-neraca-excel')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        account = ChartOfAccount.objects.create(
+            tenant=tenant,
+            kode='501',
+            nama='Biaya',
+            saldo_normal=ChartOfAccount.NormalBalance.DEBET,
+        )
+        journal = Journal.objects.create(
+            tenant=tenant,
+            no_jurnal='JUR-1',
+            tanggal=date(2026, 7, 1),
+            transaksi='jurnal_memorial',
+            keterangan='Biaya',
+        )
+        journal.lines.create(tenant=tenant, perkiraan=account, debet=Decimal('1250000.00'), kredit=Decimal('0.00'))
+
+        self.client.force_login(user)
+        response = self.client.get('/reports/neraca-saldo/', {'start_date': '2026-07-01', 'end_date': '2026-07-31', 'export': 'excel'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
     def test_rekap_transaksi_kas_pdf_pc_column_fits_administrator(self):
         require_weasyprint()
         tenant = Tenant.objects.create(name='CV Test')
