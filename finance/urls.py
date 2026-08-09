@@ -42,6 +42,7 @@ urlpatterns = [
     path('transaksi-kas/account-lookup/', views.cash_transaction_account_lookup, name='finance_transaksi_kas_account_lookup'),
     path('transaksi-kas/<uuid:uuid>/', views.cash_transaction_detail, name='finance_transaksi_kas_detail'),
     path('transaksi-bank/<uuid:uuid>/', views.bank_transaction_detail, name='finance_transaksi_bank_detail'),
+    path('kas-bon/lookup/', views.cash_advance_lookup, name='finance_kas_bon_lookup'),
     path('kas-bon/<uuid:uuid>/', views.cash_advance_detail, name='finance_kas_bon_detail'),
     path('pembayaran-kas-bon/<uuid:uuid>/', views.cash_advance_payment_detail, name='finance_pembayaran_kas_bon_detail'),
 ]

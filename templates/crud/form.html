@@ -39,12 +39,16 @@
                 </div>
             </span>
             {% elif form_model_name == 'employeecashadvancepayment' and field.name == 'kas_bon_karyawan' %}
-            <select class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" x-on:change="setCashAdvanceInfo($event.target)" {% if field.field.required %}required{% endif %}>
-                <option value="">---------</option>
-                {% for advance in field.field.queryset %}
-                <option value="{{ advance.pk }}" data-nama="{{ advance.karyawan.nama|default:'' }}" data-alamat="{{ advance.karyawan.alamat|default:'' }}" data-saldo="{{ advance.display_saldo|format_money }}" {% if field.value|stringformat:'s' == advance.pk|stringformat:'s' %}selected{% endif %}>{{ advance.no_register }}</option>
-                {% endfor %}
-            </select>
+            <span class="relative block" x-data="autocompleteLookup('{% url 'finance_kas_bon_lookup' %}', '{{ field.id_for_label }}', '{{ initial_cash_advance_label|default_if_none:''|escapejs }}')" x-init="init()">
+                <input type="hidden" id="{{ field.id_for_label }}" name="{{ field.html_name }}" value="{{ field.value|default:'' }}" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari no. register, nama karyawan, atau kas bon..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
             {% elif form_model_name == 'customerinvoicepayment' and field.name == 'tagihan_customer' %}
             <select class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" x-on:change="setInvoicePaymentInfo($event.target)" {% if field.field.required %}required{% endif %}>
                 <option value="">---------</option>
@@ -52,6 +56,17 @@
                 <option value="{{ invoice.pk }}" data-nama="{{ invoice.customer.nama|default:'' }}" data-alamat="{{ invoice.customer.alamat|default:'' }}" data-nilai="{{ invoice.nilai_pekerjaan|format_money }}" data-ppn="{{ invoice.ppn|format_money }}" data-pelunasan="{{ invoice.pelunasan|format_money }}" data-saldo="{{ invoice.display_saldo|format_money }}" {% if field.value|stringformat:'s' == invoice.pk|stringformat:'s' %}selected{% endif %}>{{ invoice.no_invoice }}</option>
                 {% endfor %}
             </select>
+            {% elif form_model_name == 'fuelpurchase' and field.name == 'armada' %}
+            <span class="relative block" x-data="autocompleteLookup('{% url 'master_lookup_armada' %}', '{{ field.id_for_label }}', '{{ initial_armada_label|default_if_none:''|escapejs }}')" x-init="init()">
+                <input type="hidden" id="{{ field.id_for_label }}" name="{{ field.html_name }}" value="{{ field.value|default:'' }}" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari nopol, jenis kendaraan, atau supir..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
             {% elif field.field.widget.attrs.lookup %}
             <span class="space-y-2" x-data="lookupSelect()" x-init="filter($refs.select)">
                 <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari {{ field.label|lower }}..." type="search" x-model="q" x-on:input="filter($refs.select)">
@@ -109,6 +124,21 @@
             <div>
                 <p class="text-slate-500">Pelunasan</p>
                 <p class="font-semibold" x-text="invoicePaymentPaid || '-'"></p>
+            </div>
+        </div>
+        {% elif form_model_name == 'fuelpurchase' and field.name == 'tanggal' %}
+        <div class="grid gap-3 rounded border border-blue-200 bg-blue-50/70 p-3 text-sm md:col-span-2 md:grid-cols-3" x-show="armadaNopol">
+            <div>
+                <p class="text-xs text-blue-700">No. Polisi Armada</p>
+                <p class="font-semibold text-slate-800" x-text="armadaNopol || '-'"></p>
+            </div>
+            <div>
+                <p class="text-xs text-blue-700">Jenis / Tipe Kendaraan</p>
+                <p class="font-semibold text-slate-800" x-text="armadaKendaraan || '-'"></p>
+            </div>
+            <div>
+                <p class="text-xs text-blue-700">Driver Utama</p>
+                <p class="font-semibold text-slate-800" x-text="armadaDriverName || '-'"></p>
             </div>
         </div>
         {% endif %}
@@ -184,10 +214,14 @@ function autocompleteLookup(endpoint, hiddenId, initialLabel) {
         select(item) {
             this.term = item.label;
             this.selectedLabel = item.label;
-            if (this.hidden) this.hidden.value = item.id;
+            if (this.hidden) {
+                this.hidden.value = item.id;
+                this.hidden.dispatchEvent(new Event('change'));
+            }
             this.results = [];
             this.activeIndex = -1;
             this.open = false;
+            window.dispatchEvent(new CustomEvent('lookup-selected', { detail: { hiddenId: this.hidden ? this.hidden.id : '', item: item } }));
         }
     }
 }function lookupSelect() {
@@ -224,6 +258,10 @@ function transactionCalculator(modelName) {
         invoicePaymentJobValue: '',
         invoicePaymentPpn: '',
         invoicePaymentPaid: '',
+        armadaNopol: '',
+        armadaKendaraan: '',
+        armadaDriverId: '',
+        armadaDriverName: '',
         init() {
             this.calculate();
             const cashAdvance = document.getElementById('id_kas_bon_karyawan');
@@ -231,9 +269,17 @@ function transactionCalculator(modelName) {
             const invoicePayment = document.getElementById('id_tagihan_customer');
             if (invoicePayment) this.setInvoicePaymentInfo(invoicePayment);
             const fuelArmada = document.getElementById('id_armada');
-            if (this.modelName === 'fuelpurchase' && fuelArmada) {
-                fuelArmada.addEventListener('change', () => this.fillLastFuelKm(fuelArmada.value));
+            if (this.modelName === 'fuelpurchase' && fuelArmada && fuelArmada.value) {
+                this.fillLastFuelKm(fuelArmada.value);
             }
+            window.addEventListener('lookup-selected', (e) => {
+                if (e.detail && e.detail.hiddenId === 'id_armada' && e.detail.item) {
+                    this.onArmadaSelected(e.detail.item);
+                }
+                if (e.detail && e.detail.hiddenId === 'id_kas_bon_karyawan' && e.detail.item) {
+                    this.setCashAdvanceInfo(e.detail.item);
+                }
+            });
             ['id_nilai_pekerjaan', 'id_ppn_persen', 'id_nominal_kas', 'id_pph_persen', 'id_pph', 'id_jenis_transaksi', 'id_debet', 'id_kredit', 'id_biaya_adm_bank', 'id_bank_utama', 'id_bank_tujuan'].forEach((id) => {
                 const input = document.getElementById(id);
                 if (input) input.addEventListener('input', () => this.calculate());
@@ -272,11 +318,18 @@ function transactionCalculator(modelName) {
             this.setDisabled('id_debet', disableDebet, clearDisabled);
             this.setDisabled('id_kredit', disableKredit, clearDisabled);
         },
-        setCashAdvanceInfo(select) {
-            const option = select.selectedOptions.length ? select.selectedOptions[0] : null;
-            this.cashAdvanceName = option ? option.dataset.nama || '' : '';
-            this.cashAdvanceAddress = option ? option.dataset.alamat || '' : '';
-            this.cashAdvanceBalance = option ? option.dataset.saldo || '' : '';
+        setCashAdvanceInfo(itemOrSelect) {
+            if (!itemOrSelect) return;
+            if (itemOrSelect.selectedOptions) {
+                const option = itemOrSelect.selectedOptions.length ? itemOrSelect.selectedOptions[0] : null;
+                this.cashAdvanceName = option ? option.dataset.nama || '' : '';
+                this.cashAdvanceAddress = option ? option.dataset.alamat || '' : '';
+                this.cashAdvanceBalance = option ? option.dataset.saldo || '' : '';
+            } else {
+                this.cashAdvanceName = itemOrSelect.nama || '';
+                this.cashAdvanceAddress = itemOrSelect.alamat || '';
+                this.cashAdvanceBalance = itemOrSelect.saldo || '';
+            }
         },
         setInvoicePaymentInfo(select) {
             const option = select.selectedOptions.length ? select.selectedOptions[0] : null;
@@ -286,6 +339,20 @@ function transactionCalculator(modelName) {
             this.invoicePaymentJobValue = option ? option.dataset.nilai || '' : '';
             this.invoicePaymentPpn = option ? option.dataset.ppn || '' : '';
             this.invoicePaymentPaid = option ? option.dataset.pelunasan || '' : '';
+        },
+        onArmadaSelected(item) {
+            this.armadaNopol = item ? item.nopol || '' : '';
+            this.armadaKendaraan = item ? item.kendaraan || '' : '';
+            this.armadaDriverId = item ? item.driver_id || '' : '';
+            this.armadaDriverName = item ? item.driver_name || '' : '';
+            if (item && item.id) {
+                this.fillLastFuelKm(item.id);
+                const driverSelect = document.getElementById('id_driver');
+                if (driverSelect && this.armadaDriverId) {
+                    driverSelect.value = String(this.armadaDriverId);
+                    driverSelect.dispatchEvent(new Event('change'));
+                }
+            }
         },
         async fillLastFuelKm(armadaId) {
             const input = document.getElementById('id_km_terakhir');

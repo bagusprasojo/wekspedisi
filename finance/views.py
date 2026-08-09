@@ -65,6 +65,39 @@ def cash_transaction_account_lookup(request):
 
 
 @login_required
+def cash_advance_lookup(request):
+    require_tenant(request)
+    from django.db.models import Q
+    from core.templatetags.crud_extras import format_money
+
+    q = request.GET.get('q', '').strip()
+    queryset = EmployeeCashAdvance.objects.filter(
+        tenant=request.tenant,
+        is_deleted=False,
+        status_lunas='Belum',
+    ).select_related('karyawan')
+    if q:
+        queryset = queryset.filter(
+            Q(no_register__icontains=q)
+            | Q(karyawan__nama__icontains=q)
+            | Q(keterangan__icontains=q)
+        )
+    results = []
+    for adv in queryset.order_by('-tanggal', '-id')[:20]:
+        saldo_val = format_money(adv.saldo)
+        label = f"{adv.no_register} - {adv.karyawan.nama if adv.karyawan else ''} (Sisa: {saldo_val})"
+        results.append({
+            'id': adv.pk,
+            'label': label,
+            'no_register': adv.no_register,
+            'nama': adv.karyawan.nama if adv.karyawan else '',
+            'alamat': adv.karyawan.alamat if adv.karyawan else '',
+            'saldo': saldo_val,
+        })
+    return JsonResponse({'results': results})
+
+
+@login_required
 def cash_transaction_detail(request, uuid):
     require_tenant(request)
     transaction = get_object_or_404(

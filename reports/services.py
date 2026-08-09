@@ -17,7 +17,29 @@ def filter_date_range(queryset, start_date=None, end_date=None, field='tanggal')
     if start_date:
         queryset = queryset.filter(**{f'{field}__gte': start_date})
     if end_date:
-        queryset = queryset.filter(**{f'{field}__lte': end_date})
+        is_datetime = False
+        try:
+            model = queryset.model
+            parts = field.split('__')
+            curr_model = model
+            for part in parts[:-1]:
+                curr_model = curr_model._meta.get_field(part).related_model
+            model_field = curr_model._meta.get_field(parts[-1])
+            is_datetime = model_field.get_internal_type() == 'DateTimeField'
+        except Exception:
+            is_datetime = False
+
+        if is_datetime:
+            if isinstance(end_date, str):
+                try:
+                    end_date = date.fromisoformat(end_date)
+                except ValueError:
+                    pass
+            if isinstance(end_date, date) and not isinstance(end_date, datetime):
+                end_date = datetime.combine(end_date, time.max)
+            queryset = queryset.filter(**{f'{field}__lte': end_date})
+        else:
+            queryset = queryset.filter(**{f'{field}__lte': end_date})
     return queryset
 
 

@@ -129,7 +129,7 @@ def delete_generated_journal(obj):
 
 def assign_number(obj, field_name, document_type):
     if not getattr(obj, field_name):
-        setattr(obj, field_name, next_document_number(obj.tenant, document_type, obj.tanggal))
+        setattr(obj, field_name, next_document_number(obj.tenant, document_type, obj.tanggal, model=obj.__class__, field_name=field_name))
 
 
 def account_totals_until(tenant, tanggal):

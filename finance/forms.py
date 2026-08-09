@@ -51,6 +51,16 @@ class FuelPurchaseForm(forms.ModelForm):
         model = FuelPurchase
         exclude = COMMON_EXCLUDE + ['no_bukti']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'armada' in self.fields:
+            self.fields['armada'].label_from_instance = lambda obj: (
+                f"{obj.nopol} - {obj.kendaraan} (Supir: {obj.driver.nama})" if getattr(obj, 'kendaraan', None) and getattr(obj, 'driver', None)
+                else f"{obj.nopol} - {obj.kendaraan}" if getattr(obj, 'kendaraan', None)
+                else f"{obj.nopol} (Supir: {obj.driver.nama})" if getattr(obj, 'driver', None)
+                else obj.nopol
+            )
+
 
 class EmployeeCashAdvanceForm(forms.ModelForm):
     class Meta:

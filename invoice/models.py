@@ -98,7 +98,7 @@ class CustomerInvoice(TenantScopedModel):
         self.ppn_persen = LEGACY_PPN_PERCENT
         self.perkiraan_piutang = get_config_account(self.tenant, 'PIUTANG_JASA_ID')
         if not self.no_invoice:
-            self.no_invoice = next_invoice_number(self.tenant, self.tanggal)
+            self.no_invoice = next_invoice_number(self.tenant, self.tanggal, model=type(self))
         self.ppn = (self.nilai_pekerjaan * LEGACY_PPN_RATE / Decimal('100')).quantize(Decimal('0.01'))
         if self.ppn <= ZERO:
             raise ValidationError('Nilai PPN belum diisi.')

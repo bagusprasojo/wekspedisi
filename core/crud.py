@@ -86,6 +86,8 @@ class TenantFormMixin(TenantRequiredMixin):
                 if form.__class__.__name__ == 'ArmadaForm' and field_name == 'driver':
                     from master.models import StakeHolder
                     field.queryset = field.queryset.filter(jenis=StakeHolder.StakeHolderType.KARYAWAN)
+                if form.__class__.__name__ in {'FuelPurchaseForm', 'CashTransactionForm'} and field_name == 'armada':
+                    field.queryset = field.queryset.select_related('driver')
                 if form.__class__.__name__ == 'FuelPurchaseForm' and field_name == 'driver':
                     from master.models import StakeHolder
                     field.queryset = field.queryset.filter(jenis=StakeHolder.StakeHolderType.KARYAWAN)
@@ -156,10 +158,8 @@ class TenantFormMixin(TenantRequiredMixin):
                     ('BankAccountForm', 'akun'),
                     ('TransactionTypeForm', 'akun'),
                     ('CashTransactionForm', 'akun_transaksi'),
-                    ('CashTransactionForm', 'armada'),
                     ('CashTransactionForm', 'bank'),
                     ('ChartOfAccountForm', 'parent'),
-                    ('FuelPurchaseForm', 'armada'),
                     ('FuelPurchaseForm', 'bank'),
                     ('FuelPurchaseForm', 'driver'),
                     ('BankTransactionForm', 'bank_utama'),
@@ -169,7 +169,6 @@ class TenantFormMixin(TenantRequiredMixin):
                     ('EmployeeCashAdvanceForm', 'perkiraan_pinjaman'),
                     ('EmployeeCashAdvanceForm', 'karyawan'),
                     ('EmployeeCashAdvancePaymentForm', 'bank'),
-                    ('EmployeeCashAdvancePaymentForm', 'kas_bon_karyawan'),
                     ('CustomerInvoicePaymentForm', 'bank'),
                     ('CustomerInvoicePaymentForm', 'tagihan_customer'),
                     ('CustomerInvoiceForm', 'customer'),
@@ -330,6 +329,22 @@ def build_crud_views(config):
         def get_context_data(self, **kwargs):
             context = super().get_context_data(**kwargs)
             context.update({'title': f'Edit {config.title}', 'cancel_url': reverse_lazy(config.success_url_name), 'form_model_name': config.model._meta.model_name})
+            if config.model._meta.model_name == 'fuelpurchase' and getattr(self, 'object', None) and getattr(self.object, 'armada', None):
+                a = self.object.armada
+                parts = [a.nopol]
+                if a.kendaraan:
+                    parts.append(a.kendaraan)
+                if a.driver:
+                    parts.append(f'Supir: {a.driver.nama}')
+                elif a.pemilik:
+                    parts.append(f'Milik: {a.pemilik}')
+                context['initial_armada_label'] = ' - '.join(parts)
+            if config.model._meta.model_name == 'employeecashadvancepayment' and getattr(self, 'object', None) and getattr(self.object, 'kas_bon_karyawan', None):
+                from decimal import Decimal
+                from core.templatetags.crud_extras import format_money
+                adv = self.object.kas_bon_karyawan
+                saldo_val = format_money(adv.saldo + (self.object.nominal or Decimal('0')))
+                context['initial_cash_advance_label'] = f"{adv.no_register} - {adv.karyawan.nama if adv.karyawan else ''} (Sisa: {saldo_val})"
             return context
 
     class GeneratedDeleteView(TenantDeleteMixin, DeleteView):

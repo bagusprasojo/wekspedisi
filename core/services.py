@@ -21,7 +21,7 @@ def format_period(date_value):
     return date_value.strftime('%Y%m')
 
 
-def next_document_number(tenant, document_type, date_value):
+def next_document_number(tenant, document_type, date_value, model=None, field_name='no_bukti'):
     from core.models import DocumentSequence
 
     period = format_period(date_value)
@@ -35,12 +35,17 @@ def next_document_number(tenant, document_type, date_value):
                 defaults={'last_number': 0},
             )
         )
-        sequence.last_number += 1
-        sequence.save(update_fields=['last_number', 'updated_at'])
-        return f'{document_type}-{period}{sequence.last_number:04d}'
+        while True:
+            sequence.last_number += 1
+            candidate = f'{document_type}-{period}{sequence.last_number:04d}'
+            if model is not None:
+                if model.objects.filter(tenant=tenant, **{field_name: candidate}).exists():
+                    continue
+            sequence.save(update_fields=['last_number', 'updated_at'])
+            return candidate
 
 
-def next_invoice_number(tenant, date_value):
+def next_invoice_number(tenant, date_value, model=None):
     from core.models import DocumentSequence
     from master.services import get_config_value
 
@@ -56,7 +61,12 @@ def next_invoice_number(tenant, date_value):
                 defaults={'last_number': 0},
             )
         )
-        sequence.last_number += 1
-        sequence.save(update_fields=['last_number', 'updated_at'])
         roman_month = ROMAN_MONTHS[date_value.month]
-        return f'{sequence.last_number:03d}/{roman_month}/{invoice_code}/{date_value.year}'
+        while True:
+            sequence.last_number += 1
+            candidate = f'{sequence.last_number:03d}/{roman_month}/{invoice_code}/{date_value.year}'
+            if model is not None:
+                if model.objects.filter(tenant=tenant, no_invoice=candidate).exists():
+                    continue
+            sequence.save(update_fields=['last_number', 'updated_at'])
+            return candidate

@@ -32,6 +32,34 @@ def stakeholder_lookup(request):
     return JsonResponse({'results': results})
 
 @login_required
+def armada_lookup(request):
+    require_tenant(request)
+    q = request.GET.get('q', '').strip()
+    queryset = Armada.objects.filter(tenant=request.tenant, is_deleted=False).select_related('driver')
+    if q:
+        queryset = queryset.filter(
+            Q(nopol__icontains=q) | Q(kendaraan__icontains=q) | Q(driver__nama__icontains=q) | Q(pemilik__icontains=q)
+        )
+    results = []
+    for a in queryset.order_by('nopol')[:20]:
+        label_parts = [a.nopol]
+        if a.kendaraan:
+            label_parts.append(a.kendaraan)
+        if a.driver:
+            label_parts.append(f'Supir: {a.driver.nama}')
+        elif a.pemilik:
+            label_parts.append(f'Milik: {a.pemilik}')
+        results.append({
+            'id': a.pk,
+            'label': ' - '.join(label_parts),
+            'nopol': a.nopol,
+            'kendaraan': a.kendaraan or '',
+            'driver_id': a.driver_id or '',
+            'driver_name': a.driver.nama if a.driver else '',
+        })
+    return JsonResponse({'results': results})
+
+@login_required
 def bank_detail(request, uuid):
     require_tenant(request)
     bank = get_object_or_404(

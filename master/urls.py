@@ -15,6 +15,7 @@ CONFIGS = {
 
 urlpatterns = [
     path('lookup/stakeholder/', views.stakeholder_lookup, name='master_lookup_stakeholder'),
+    path('lookup/armada/', views.armada_lookup, name='master_lookup_armada'),
     path('bank/<uuid:uuid>/', views.bank_detail, name='master_bank_detail'),
     path('customer/<uuid:uuid>/', views.customer_detail, name='master_customer_detail'),
     path('karyawan/<uuid:uuid>/', views.karyawan_detail, name='master_karyawan_detail'),

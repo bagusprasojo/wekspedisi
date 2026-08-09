@@ -14,9 +14,9 @@
             <div><p class="text-slate-500">Karyawan</p><p class="font-semibold">{{ object.karyawan }}</p></div>
             <div><p class="text-slate-500">Alamat</p><p class="font-semibold">{{ object.karyawan.alamat|default:"-" }}</p></div>
             <div><p class="text-slate-500">Kas/Bank</p><p class="font-semibold">{{ object.bank|default:"-" }}</p></div>
-            <div><p class="text-slate-500">Nominal</p><p class="font-semibold">{{ object.nominal }}</p></div>
-            <div><p class="text-slate-500">Pelunasan</p><p class="font-semibold">{{ object.pelunasan }}</p></div>
-            <div><p class="text-slate-500">Saldo</p><p class="font-semibold">{{ object.saldo }}</p></div>
+            <div><p class="text-slate-500">Nominal</p><p class="font-semibold">{{ object.nominal|format_money }}</p></div>
+            <div><p class="text-slate-500">Pelunasan</p><p class="font-semibold">{{ object.pelunasan|format_money }}</p></div>
+            <div><p class="text-slate-500">Saldo</p><p class="font-semibold">{{ object.saldo|format_money }}</p></div>
             <div><p class="text-slate-500">Status Lunas</p><p class="font-semibold">{{ object.status_lunas }}</p></div>
         </div>
         <div class="mt-4">
@@ -42,8 +42,8 @@
                 <tr>
                     <td class="px-4 py-3">{{ line.perkiraan.kode }}</td>
                     <td class="px-4 py-3">{{ line.perkiraan.nama }}</td>
-                    <td class="px-4 py-3 text-right">{{ line.debet }}</td>
-                    <td class="px-4 py-3 text-right">{{ line.kredit }}</td>
+                    <td class="px-4 py-3 text-right">{{ line.debet|format_money }}</td>
+                    <td class="px-4 py-3 text-right">{{ line.kredit|format_money }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

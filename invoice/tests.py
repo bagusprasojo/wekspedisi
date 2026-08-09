@@ -159,8 +159,7 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
         with self.assertRaisesMessage(ValidationError, 'Pembayaran melebihi saldo piutang.'):
             payment.save_with_business_rules(user=self.user)
 
-    def test_invoice_and_receipt_endpoints_return_pdf(self):
-        require_weasyprint()
+    def test_invoice_and_receipt_endpoints_return_html(self):
         UserProfile.objects.create(user=self.user, tenant=self.tenant, role=UserProfile.Role.ADMIN)
         invoice = CustomerInvoice(
             tenant=self.tenant,
@@ -175,11 +174,11 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
         receipt_response = self.client.get(f'/invoice/invoice-customer/{invoice.uuid}/kwitansi/')
 
         self.assertEqual(invoice_response.status_code, 200)
-        self.assertEqual(invoice_response['Content-Type'], 'application/pdf')
-        self.assertTrue(invoice_response.content.startswith(b'%PDF'))
+        self.assertIn('text/html', invoice_response['Content-Type'])
+        self.assertIn(b'window.print()', invoice_response.content)
         self.assertEqual(receipt_response.status_code, 200)
-        self.assertEqual(receipt_response['Content-Type'], 'application/pdf')
-        self.assertTrue(receipt_response.content.startswith(b'%PDF'))
+        self.assertIn('text/html', receipt_response['Content-Type'])
+        self.assertIn(b'window.print()', receipt_response.content)
 
     def test_invoice_number_resets_monthly_and_uses_tenant_config_code(self):
         TenantConfig.objects.filter(tenant=self.tenant, kode='INVOICE_CODE').update(nilai='INV_CUSTOM')
