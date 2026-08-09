@@ -141,6 +141,7 @@ def customer_invoice_slip(request, uuid):
         },
     )
 
+
 @login_required
 def customer_invoice_receipt(request, uuid):
     require_tenant(request)
