@@ -329,7 +329,7 @@ def build_crud_views(config):
         def get_context_data(self, **kwargs):
             context = super().get_context_data(**kwargs)
             context.update({'title': f'Edit {config.title}', 'cancel_url': reverse_lazy(config.success_url_name), 'form_model_name': config.model._meta.model_name})
-            if config.model._meta.model_name == 'fuelpurchase' and getattr(self, 'object', None) and getattr(self.object, 'armada', None):
+            if config.model._meta.model_name in {'fuelpurchase', 'cashtransaction'} and getattr(self, 'object', None) and getattr(self.object, 'armada', None):
                 a = self.object.armada
                 parts = [a.nopol]
                 if a.kendaraan:

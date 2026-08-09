@@ -56,7 +56,7 @@
                 <option value="{{ invoice.pk }}" data-nama="{{ invoice.customer.nama|default:'' }}" data-alamat="{{ invoice.customer.alamat|default:'' }}" data-nilai="{{ invoice.nilai_pekerjaan|format_money }}" data-ppn="{{ invoice.ppn|format_money }}" data-pelunasan="{{ invoice.pelunasan|format_money }}" data-saldo="{{ invoice.display_saldo|format_money }}" {% if field.value|stringformat:'s' == invoice.pk|stringformat:'s' %}selected{% endif %}>{{ invoice.no_invoice }}</option>
                 {% endfor %}
             </select>
-            {% elif form_model_name == 'fuelpurchase' and field.name == 'armada' %}
+            {% elif field.name == 'armada' %}
             <span class="relative block" x-data="autocompleteLookup('{% url 'master_lookup_armada' %}', '{{ field.id_for_label }}', '{{ initial_armada_label|default_if_none:''|escapejs }}')" x-init="init()">
                 <input type="hidden" id="{{ field.id_for_label }}" name="{{ field.html_name }}" value="{{ field.value|default:'' }}" {% if field.field.required %}required{% endif %}>
                 <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari nopol, jenis kendaraan, atau supir..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
