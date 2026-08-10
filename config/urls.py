@@ -4,10 +4,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 
-from core.views import dashboard
+from core.views import dashboard, dashboard_summary_api
 
 urlpatterns = [
     path('', dashboard, name='dashboard'),
+    path('api/dashboard-summary/', dashboard_summary_api, name='dashboard_summary_api'),
     path('platform/', include('tenants.urls')),
     path('master/', include('master.urls')),
     path('finance/', include('finance.urls')),
