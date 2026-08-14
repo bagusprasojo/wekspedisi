@@ -24,7 +24,7 @@ class KaryawanForm(forms.ModelForm):
 
 
 class ArmadaForm(forms.ModelForm):
-    driver = forms.ModelChoiceField(queryset=StakeHolder.objects.none(), required=False, widget=forms.HiddenInput)
+    driver = forms.ModelChoiceField(queryset=StakeHolder.objects.all(), required=False, widget=forms.HiddenInput)
     driver_text = forms.CharField(label='Driver', required=False)
 
     class Meta:

@@ -14,6 +14,7 @@
             <span class="mb-1 block font-medium">{{ field.label }}</span>
             {% if form_model_name == 'armada' and field.name == 'driver_text' %}
                 <span class="relative block" x-data="autocompleteLookup('{% url 'master_lookup_stakeholder' %}?jenis=karyawan', 'id_driver', '{{ field.value|default_if_none:''|escapejs }}')" x-init="init()">
+                <input type="hidden" id="id_driver" name="driver" value="{{ form.driver.value|default:'' }}">
                 <input class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" placeholder="Cari/pilih driver..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false">
                 <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
                     <template x-for="(item, index) in results" :key="item.id">

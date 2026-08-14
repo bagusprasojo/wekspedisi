@@ -50,6 +50,28 @@ class StakeHolderLegacyShapeTests(TestCase):
         self.assertIn(karyawan, form.fields['driver'].queryset)
         self.assertNotIn(customer, form.fields['driver'].queryset)
 
+    def test_armada_create_view_with_driver_succeeds(self):
+        karyawan = StakeHolder.objects.create(
+            tenant=self.tenant,
+            kode='K001',
+            nama='Driver Karyawan',
+            jenis=StakeHolder.StakeHolderType.KARYAWAN,
+        )
+        user = get_user_model().objects.create_user(username='admin-armada-test')
+        UserProfile.objects.create(user=user, tenant=self.tenant, role=UserProfile.Role.ADMIN)
+        self.client.force_login(user)
+
+        response = self.client.post('/master/armada/new/', {
+            'nopol': 'B 9999 XYZ',
+            'kendaraan': 'Engkel',
+            'pemilik': 'PT Test',
+            'driver': str(karyawan.pk),
+            'driver_text': karyawan.nama,
+        })
+        self.assertEqual(response.status_code, 302)
+        armada = Armada.objects.get(nopol='B 9999 XYZ')
+        self.assertEqual(armada.driver, karyawan)
+
 class BankAccountDetailUxTests(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name='CV Test')
