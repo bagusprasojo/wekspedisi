@@ -6,14 +6,20 @@
 
 {% block content %}
 <form class="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-4" method="get">
-    <div class="min-w-64">
-        <label class="mb-1 block text-sm font-medium text-slate-700" for="account">Akun</label>
-        <select class="w-full rounded border px-3 py-2 text-sm" id="account" name="account">
-            <option value="">Semua akun</option>
-            {% for account in accounts %}
-            <option value="{{ account.pk }}" {% if selected_account.pk == account.pk %}selected{% endif %}>{{ account.kode }} - {{ account.nama }}</option>
-            {% endfor %}
-        </select>
+    <div class="relative min-w-72" x-data="bukuBesarAccountLookup()" x-init="init()">
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="account_input">Akun Perkiraan</label>
+        <input type="hidden" id="account" name="account" :value="selectedId">
+        <div class="relative">
+            <input class="w-full rounded border px-3 py-2 text-sm pr-7" id="account_input" type="text" placeholder="Cari kode atau nama akun..." x-model="term" x-on:input.debounce.150ms="search()" x-on:focus="open = true" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false">
+            <button type="button" class="absolute right-2 top-2.5 text-slate-400 hover:text-slate-600 text-xs font-bold" x-show="selectedId" x-on:click="clear()" title="Hapus pilihan">?</button>
+        </div>
+        <div class="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded border bg-white shadow" x-cloak x-show="open" x-on:click.outside="open = false">
+            <button type="button" class="block w-full border-b px-3 py-2 text-left text-sm hover:bg-slate-100 font-medium text-slate-600" x-on:click="select({id: '', label: 'Semua akun'})">-- Semua akun --</button>
+            <template x-for="(item, index) in filteredList" :key="item.id">
+                <button type="button" class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" x-bind:class="{ 'bg-slate-100 font-semibold text-slate-900': index === activeIndex }" x-on:mouseenter="activeIndex = index" x-on:click="select(item)" x-text="item.label"></button>
+            </template>
+            <div class="px-3 py-2 text-sm text-slate-500" x-show="filteredList.length === 0 && term.length > 0">Akun tidak ditemukan.</div>
+        </div>
     </div>
     <div>
         <label class="mb-1 block text-sm font-medium text-slate-700" for="start_date">Tanggal Awal</label>
@@ -81,4 +87,77 @@
         {% endif %}
     </table>
 </div>
+
+<script>
+function bukuBesarAccountLookup() {
+    const allAccounts = [
+        {% for acc in accounts %}
+        { id: '{{ acc.pk }}', kode: '{{ acc.kode|escapejs }}', nama: '{{ acc.nama|escapejs }}', label: '{{ acc.kode|escapejs }} - {{ acc.nama|escapejs }}' },
+        {% endfor %}
+    ];
+    const initialId = '{{ selected_account.pk|default:"" }}';
+    const initialObj = allAccounts.find(a => str(a.id) === str(initialId)) || null;
+
+    return {
+        selectedId: initialId,
+        term: initialObj ? initialObj.label : '',
+        selectedLabel: initialObj ? initialObj.label : '',
+        open: false,
+        activeIndex: -1,
+        filteredList: allAccounts,
+        init() {
+            if (this.selectedId && !this.selectedLabel) {
+                const found = allAccounts.find(a => String(a.id) === String(this.selectedId));
+                if (found) {
+                    this.selectedLabel = found.label;
+                    this.term = found.label;
+                }
+            }
+        },
+        search() {
+            const q = this.term.trim().toLowerCase();
+            if (q !== this.selectedLabel.toLowerCase()) {
+                this.selectedId = '';
+            }
+            if (!q) {
+                this.filteredList = allAccounts;
+                this.open = true;
+                this.activeIndex = -1;
+                return;
+            }
+            this.filteredList = allAccounts.filter(a =>
+                a.kode.toLowerCase().includes(q) || a.nama.toLowerCase().includes(q) || a.label.toLowerCase().includes(q)
+            );
+            this.activeIndex = this.filteredList.length ? 0 : -1;
+            this.open = true;
+        },
+        move(step) {
+            if (!this.open && this.filteredList.length) this.open = true;
+            if (!this.filteredList.length) return;
+            this.activeIndex = (this.activeIndex + step + this.filteredList.length) % this.filteredList.length;
+        },
+        chooseActive() {
+            if (this.activeIndex >= 0 && this.filteredList[this.activeIndex]) {
+                this.select(this.filteredList[this.activeIndex]);
+            }
+        },
+        select(item) {
+            this.selectedId = item.id;
+            this.term = item.id ? item.label : '';
+            this.selectedLabel = item.id ? item.label : '';
+            this.open = false;
+        },
+        clear() {
+            this.selectedId = '';
+            this.term = '';
+            this.selectedLabel = '';
+            this.filteredList = allAccounts;
+            this.open = false;
+        }
+    };
+}
+function str(val) {
+    return String(val || '');
+}
+</script>
 {% endblock %}

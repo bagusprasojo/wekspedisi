@@ -49,7 +49,7 @@ def next_invoice_number(tenant, date_value, model=None):
     from core.models import DocumentSequence
     from master.services import get_config_value
 
-    period = date_value.strftime('%Y%m')
+    period = date_value.strftime('%Y')
     invoice_code = get_config_value(tenant, 'INVOICE_CODE')
     with transaction.atomic():
         sequence, _ = (

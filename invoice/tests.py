@@ -180,7 +180,7 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
         self.assertIn('text/html', receipt_response['Content-Type'])
         self.assertIn(b'window.print()', receipt_response.content)
 
-    def test_invoice_number_resets_monthly_and_uses_tenant_config_code(self):
+    def test_invoice_number_resets_yearly_and_uses_tenant_config_code(self):
         TenantConfig.objects.filter(tenant=self.tenant, kode='INVOICE_CODE').update(nilai='INV_CUSTOM')
         first = CustomerInvoice(
             tenant=self.tenant,
@@ -196,9 +196,17 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
             pekerjaan='Ongkos kirim',
             nilai_pekerjaan=Decimal('1000000'),
         ).save_with_business_rules(user=self.user)
+        third = CustomerInvoice(
+            tenant=self.tenant,
+            customer=self.customer,
+            tanggal=date(2027, 1, 15),
+            pekerjaan='Ongkos kirim',
+            nilai_pekerjaan=Decimal('1000000'),
+        ).save_with_business_rules(user=self.user)
 
         self.assertEqual(first.no_invoice, '001/VII/INV_CUSTOM/2026')
-        self.assertEqual(second.no_invoice, '001/VIII/INV_CUSTOM/2026')
+        self.assertEqual(second.no_invoice, '002/VIII/INV_CUSTOM/2026')
+        self.assertEqual(third.no_invoice, '001/I/INV_CUSTOM/2027')
 
     def test_invoice_save_requires_invoice_tenant_configs(self):
         TenantConfig.objects.filter(tenant=self.tenant, kode='INVOICE_CODE').delete()
