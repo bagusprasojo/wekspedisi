@@ -72,6 +72,12 @@ class ClosingPeriod(TenantScopedModel):
         if last and last.pk != self.pk:
             from accounting.services import BusinessRuleError
             raise BusinessRuleError('Hanya closing terakhir yang bisa dihapus.')
+        from accounting.models import Journal
+        Journal.objects.filter(
+            tenant=self.tenant,
+            transaksi='jurnal_tutup_tahun',
+            tanggal=self.tanggal,
+        ).delete()
         self.bank_balances.all().delete()
         self.account_balances.all().delete()
         self.delete()

@@ -227,3 +227,59 @@ class JournalAdjustmentFormTests(TestCase):
         self.assertContains(response, '1.250.000,50')
         self.assertContains(response, '>0<')
         self.assertNotContains(response, '1.250.000,00')
+    def test_december_closing_generates_year_end_closing_journal_and_zeros_nominal_accounts(self):
+        from master.models import TenantConfig
+        self.revenue.golongan = 'LABA/RUGI'
+        self.revenue.kelompok = 'PENDAPATAN'
+        self.revenue.save()
+
+        self.expense.golongan = 'LABA/RUGI'
+        self.expense.kelompok = 'BIAYA'
+        self.expense.save()
+
+        retained = self.account('302', 'Laba Ditahan')
+        retained.golongan = 'PASIVA'
+        retained.kelompok = 'EQUITAS'
+        retained.saldo_normal = ChartOfAccount.NormalBalance.KREDIT
+        retained.save()
+
+        TenantConfig.objects.create(tenant=self.tenant, kode='AKUN_LABA_DITAHAN_ID', nilai=str(retained.pk))
+
+        j1 = Journal.objects.create(
+            tenant=self.tenant,
+            no_jurnal='JUR-100',
+            tanggal=date(2026, 12, 10),
+            transaksi='jurnal_memorial',
+            keterangan='Pendapatan',
+        )
+        JournalLine.objects.create(tenant=self.tenant, journal=j1, perkiraan=self.revenue, debet=0, kredit=Decimal('5000000'))
+        JournalLine.objects.create(tenant=self.tenant, journal=j1, perkiraan=self.expense, debet=Decimal('2000000'), kredit=0)
+
+        closing = ClosingPeriod(tenant=self.tenant, tanggal=date(2026, 12, 31), keterangan='Desember').save_with_business_rules(user=self.user)
+
+        closing_journal = Journal.objects.filter(tenant=self.tenant, transaksi='jurnal_tutup_tahun', tanggal=date(2026, 12, 31)).first()
+        self.assertIsNotNone(closing_journal)
+        self.assertEqual(closing_journal.no_jurnal, 'JUR-CLO-2026')
+
+        rev_line = closing_journal.lines.filter(perkiraan=self.revenue).first()
+        exp_line = closing_journal.lines.filter(perkiraan=self.expense).first()
+        ret_line = closing_journal.lines.filter(perkiraan=retained).first()
+
+        self.assertIsNotNone(rev_line)
+        self.assertEqual(rev_line.debet, Decimal('5000000'))
+        self.assertEqual(exp_line.kredit, Decimal('2000000'))
+        self.assertEqual(ret_line.kredit, Decimal('3000000'))
+
+        # Nominal account balances in ClosingAccountBalance snapshot per Dec 31 should be zeroed (not included or zero)
+        rev_snap = closing.account_balances.filter(perkiraan=self.revenue).first()
+        exp_snap = closing.account_balances.filter(perkiraan=self.expense).first()
+        self.assertIsNone(rev_snap)
+        self.assertIsNone(exp_snap)
+
+        ret_snap = closing.account_balances.filter(perkiraan=retained).first()
+        self.assertIsNotNone(ret_snap)
+        self.assertEqual(ret_snap.kredit, Decimal('3000000'))
+
+        # Un-closing December should delete closing journal
+        closing.delete_with_business_rules(user=self.user)
+        self.assertFalse(Journal.objects.filter(tenant=self.tenant, transaksi='jurnal_tutup_tahun').exists())

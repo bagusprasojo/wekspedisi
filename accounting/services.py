@@ -164,10 +164,114 @@ def normal_balance_amount(account, totals):
     return {'debet': amount, 'kredit': Decimal('0')} if amount >= 0 else {'debet': Decimal('0'), 'kredit': abs(amount)}
 
 
+def refresh_year_end_closing_journal(closing, user=None):
+    from accounting.models import Journal, JournalLine
+    from master.models import ChartOfAccount
+    from master.services import get_config_account
+    from django.db import models
+
+    Journal.objects.filter(
+        tenant=closing.tenant,
+        transaksi='jurnal_tutup_tahun',
+        tanggal=closing.tanggal,
+    ).delete()
+
+    if closing.tanggal.month != 12 or closing.tanggal.day != 31:
+        return None
+
+    retained_earnings = get_config_account(closing.tenant, 'AKUN_LABA_DITAHAN_ID')
+    if not retained_earnings:
+        raise BusinessRuleError('Config AKUN_LABA_DITAHAN_ID wajib diset untuk closing bulan Desember.')
+    validate_leaf_account(retained_earnings)
+
+    start_of_year = date(closing.tanggal.year, 1, 1)
+
+    totals_by_account = (
+        JournalLine.objects.filter(
+            tenant=closing.tenant,
+            is_deleted=False,
+            journal__tenant=closing.tenant,
+            journal__is_deleted=False,
+            journal__tanggal__gte=start_of_year,
+            journal__tanggal__lte=closing.tanggal,
+        )
+        .exclude(journal__transaksi='jurnal_tutup_tahun')
+        .values('perkiraan')
+        .annotate(total_debet=Sum('debet'), total_kredit=Sum('kredit'))
+    )
+    totals_map = {
+        row['perkiraan']: {
+            'debet': row['total_debet'] or Decimal('0'),
+            'kredit': row['total_kredit'] or Decimal('0'),
+        }
+        for row in totals_by_account
+    }
+
+    nominal_accounts = ChartOfAccount.objects.filter(
+        tenant=closing.tenant,
+        is_deleted=False,
+        is_active=True,
+    ).filter(
+        models.Q(golongan='LABA/RUGI') | models.Q(kelompok__in=['PENDAPATAN', 'BIAYA'])
+    )
+
+    lines_data = []
+    total_debet = Decimal('0')
+    total_kredit = Decimal('0')
+
+    for account in nominal_accounts:
+        if not account.is_leaf:
+            continue
+        totals = totals_map.get(account.pk, {'debet': Decimal('0'), 'kredit': Decimal('0')})
+        net = totals['debet'] - totals['kredit']
+        if net == Decimal('0'):
+            continue
+
+        if net > Decimal('0'):
+            lines_data.append({'account': account, 'debet': Decimal('0'), 'kredit': net})
+            total_kredit += net
+        else:
+            amount = abs(net)
+            lines_data.append({'account': account, 'debet': amount, 'kredit': Decimal('0')})
+            total_debet += amount
+
+    if not lines_data:
+        return None
+
+    retained_diff = total_debet - total_kredit
+    if retained_diff > Decimal('0'):
+        lines_data.append({'account': retained_earnings, 'debet': Decimal('0'), 'kredit': retained_diff})
+    elif retained_diff < Decimal('0'):
+        lines_data.append({'account': retained_earnings, 'debet': abs(retained_diff), 'kredit': Decimal('0')})
+
+    no_jurnal = f'JUR-CLO-{closing.tanggal.year}'
+    journal = Journal.objects.create(
+        tenant=closing.tenant,
+        no_jurnal=no_jurnal,
+        tanggal=closing.tanggal,
+        transaksi='jurnal_tutup_tahun',
+        transaksi_id=closing.pk,
+        keterangan=f'Jurnal Penutup Tahun {closing.tanggal.year}',
+        created_by=user,
+    )
+    for l in lines_data:
+        JournalLine.objects.create(
+            tenant=closing.tenant,
+            journal=journal,
+            perkiraan=l['account'],
+            debet=l['debet'],
+            kredit=l['kredit'],
+            created_by=user,
+        )
+    return journal
+
+
 @transaction.atomic
 def refresh_closing_snapshots(closing, user=None):
     from accounting.models import ClosingAccountBalance, ClosingBankBalance
     from master.models import BankAccount, ChartOfAccount
+
+    refresh_year_end_closing_journal(closing, user=user)
 
     totals_by_account = account_totals_until(closing.tenant, closing.tanggal)
     ClosingBankBalance.objects.filter(closing=closing).delete()

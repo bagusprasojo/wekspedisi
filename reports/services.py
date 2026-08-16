@@ -94,21 +94,20 @@ def buku_besar(tenant, start_date=None, end_date=None, account=None):
     return rows
 
 
-def trial_balance(tenant, start_date=None, end_date=None):
+def trial_balance(tenant, start_date=None, end_date=None, include_closing=False):
     end_cutoff = end_date or date.today()
     sow_totals_by_account = {}
     if start_date:
-        sow_rows = (
-            JournalLine.objects.filter(
-                tenant=tenant,
-                is_deleted=False,
-                journal__tenant=tenant,
-                journal__is_deleted=False,
-                journal__tanggal__lt=start_date,
-            )
-            .values('perkiraan')
-            .annotate(total_debet=Sum('debet'), total_kredit=Sum('kredit'))
+        sow_qs = JournalLine.objects.filter(
+            tenant=tenant,
+            is_deleted=False,
+            journal__tenant=tenant,
+            journal__is_deleted=False,
+            journal__tanggal__lt=start_date,
         )
+        if not include_closing:
+            sow_qs = sow_qs.exclude(journal__transaksi='jurnal_tutup_tahun')
+        sow_rows = sow_qs.values('perkiraan').annotate(total_debet=Sum('debet'), total_kredit=Sum('kredit'))
         for row in sow_rows:
             sow_totals_by_account[row['perkiraan']] = {
                 'debet': row['total_debet'] or ZERO,
@@ -122,6 +121,8 @@ def trial_balance(tenant, start_date=None, end_date=None):
         journal__is_deleted=False,
         journal__tanggal__lte=end_cutoff,
     )
+    if not include_closing:
+        mutation_query = mutation_query.exclude(journal__transaksi='jurnal_tutup_tahun')
     if start_date:
         mutation_query = mutation_query.filter(journal__tanggal__gte=start_date)
 

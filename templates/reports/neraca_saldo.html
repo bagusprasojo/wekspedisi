@@ -14,6 +14,10 @@
         <label class="mb-1 block text-sm font-medium text-slate-700" for="end_date">Tanggal Akhir</label>
         <input class="rounded border px-3 py-2 text-sm" id="end_date" name="end_date" type="date" value="{{ end_date|date:'Y-m-d' }}">
     </div>
+    <div class="flex items-center gap-2 pb-2">
+        <input class="rounded border-slate-300 text-slate-900 focus:ring-slate-500" id="include_closing" name="include_closing" type="checkbox" value="1" {% if include_closing %}checked{% endif %}>
+        <label class="text-sm font-medium text-slate-700" for="include_closing">Sertakan Jurnal Tutup Tahun</label>
+    </div>
     <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Tampilkan</button>
     <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="excel">Export Excel</button>
     <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>

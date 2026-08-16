@@ -282,3 +282,37 @@ class ReportLayoutTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.content.startswith(b'%PDF'))
+
+    def test_trial_balance_include_and_exclude_closing_journal(self):
+        tenant = Tenant.objects.create(name='CV Test')
+        user = get_user_model().objects.create_user(username='admin-tb')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        rev = ChartOfAccount.objects.create(tenant=tenant, kode='401', nama='Pendapatan', saldo_normal=ChartOfAccount.NormalBalance.KREDIT, golongan='LABA/RUGI', kelompok='PENDAPATAN')
+        ret = ChartOfAccount.objects.create(tenant=tenant, kode='302', nama='Laba Ditahan', saldo_normal=ChartOfAccount.NormalBalance.KREDIT, golongan='PASIVA', kelompok='EQUITAS')
+        from master.models import TenantConfig
+        TenantConfig.objects.create(tenant=tenant, kode='AKUN_LABA_DITAHAN_ID', nilai=str(ret.pk))
+
+        from accounting.models import Journal, JournalLine, ClosingPeriod
+        j1 = Journal.objects.create(tenant=tenant, no_jurnal='JUR-1', tanggal=date(2026, 12, 1), transaksi='jurnal_memorial')
+        JournalLine.objects.create(tenant=tenant, journal=j1, perkiraan=rev, debet=0, kredit=Decimal('1000000'))
+
+        ClosingPeriod(tenant=tenant, tanggal=date(2026, 12, 31)).save_with_business_rules(user=user)
+
+        # Trial balance WITHOUT include_closing (default): rev has mutasi kredit 1.000.000
+        tb_default = services.trial_balance(tenant, start_date=date(2026, 12, 1), end_date=date(2026, 12, 31), include_closing=False)
+        rev_row_def = next(r for r in tb_default if r['account'] == rev)
+        self.assertEqual(rev_row_def['kredit'], Decimal('1000000'))
+        self.assertEqual(rev_row_def['akhir_kredit'], Decimal('1000000'))
+
+        # Trial balance WITH include_closing=True: closing journal zeros rev (mutasi debet 1.000.000), ret gets kredit 1.000.000
+        tb_closing = services.trial_balance(tenant, start_date=date(2026, 12, 1), end_date=date(2026, 12, 31), include_closing=True)
+        rev_row_clo = next(r for r in tb_closing if r['account'] == rev)
+        ret_row_clo = next(r for r in tb_closing if r['account'] == ret)
+        self.assertEqual(rev_row_clo['debet'], Decimal('1000000'))
+        self.assertEqual(rev_row_clo['akhir_kredit'], Decimal('0'))
+        self.assertEqual(ret_row_clo['kredit'], Decimal('1000000'))
+
+        self.client.force_login(user)
+        res = self.client.get('/reports/neraca-saldo/', {'start_date': '2026-12-01', 'end_date': '2026-12-31', 'include_closing': '1'})
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Sertakan Jurnal Tutup Tahun')

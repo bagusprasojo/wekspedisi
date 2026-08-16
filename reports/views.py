@@ -203,7 +203,8 @@ def buku_besar(request):
 def neraca_saldo(request):
     require_tenant(request)
     filters = month_report_filters(request)
-    rows = services.trial_balance(request.tenant, filters['start_date'], filters['end_date'])
+    include_closing = request.GET.get('include_closing') == '1'
+    rows = services.trial_balance(request.tenant, filters['start_date'], filters['end_date'], include_closing=include_closing)
     if request.GET.get('export') in {'excel', 'pdf'}:
         period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
         headers = ['Kode', 'Nama Perkiraan', 'Pos', 'Saldo Awal Debet', 'Saldo Awal Kredit', 'Mutasi Debet', 'Mutasi Kredit', 'Saldo Akhir Debet', 'Saldo Akhir Kredit']
@@ -260,7 +261,7 @@ def neraca_saldo(request):
             totals,
             landscape=True,
         )
-    return render(request, 'reports/neraca_saldo.html', {'title': 'Neraca Saldo', 'rows': rows, **filters})
+    return render(request, 'reports/neraca_saldo.html', {'title': 'Neraca Saldo', 'rows': rows, 'include_closing': include_closing, **filters})
 
 
 @login_required
