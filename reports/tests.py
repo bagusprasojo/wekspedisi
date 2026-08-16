@@ -312,7 +312,24 @@ class ReportLayoutTests(TestCase):
         self.assertEqual(rev_row_clo['akhir_kredit'], Decimal('0'))
         self.assertEqual(ret_row_clo['kredit'], Decimal('1000000'))
 
+        # Trial balance in NEXT YEAR (Jan 2027): Saldo Awal (SOW) MUST keep 2026 closing journal even if include_closing=False
+        tb_next_year = services.trial_balance(tenant, start_date=date(2027, 1, 1), end_date=date(2027, 1, 31), include_closing=False)
+        rev_row_next = next((r for r in tb_next_year if r['account'] == rev), None)
+        ret_row_next = next(r for r in tb_next_year if r['account'] == ret)
+        self.assertIsNone(rev_row_next)  # Fully zeroed out in 2027 SOW & mutations
+        self.assertEqual(ret_row_next['sow_kredit'], Decimal('1000000'))
+
         self.client.force_login(user)
         res = self.client.get('/reports/neraca-saldo/', {'start_date': '2026-12-01', 'end_date': '2026-12-31', 'include_closing': '1'})
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'Sertakan Jurnal Tutup Tahun')
+
+    def test_neraca_saldo_requires_same_year_period(self):
+        tenant = Tenant.objects.create(name='CV Test')
+        user = get_user_model().objects.create_user(username='admin-same-year')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+
+        self.client.force_login(user)
+        res = self.client.get('/reports/neraca-saldo/', {'start_date': '2025-06-01', 'end_date': '2027-06-30'})
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Periode Neraca Saldo harus berada pada tahun yang sama.')

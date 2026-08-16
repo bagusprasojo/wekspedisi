@@ -105,8 +105,7 @@ def trial_balance(tenant, start_date=None, end_date=None, include_closing=False)
             journal__is_deleted=False,
             journal__tanggal__lt=start_date,
         )
-        if not include_closing:
-            sow_qs = sow_qs.exclude(journal__transaksi='jurnal_tutup_tahun')
+        # Saldo Awal (sebelum periode) SELALU memperhitungkan jurnal tutup tahun periode lalu
         sow_rows = sow_qs.values('perkiraan').annotate(total_debet=Sum('debet'), total_kredit=Sum('kredit'))
         for row in sow_rows:
             sow_totals_by_account[row['perkiraan']] = {
@@ -121,10 +120,11 @@ def trial_balance(tenant, start_date=None, end_date=None, include_closing=False)
         journal__is_deleted=False,
         journal__tanggal__lte=end_cutoff,
     )
-    if not include_closing:
-        mutation_query = mutation_query.exclude(journal__transaksi='jurnal_tutup_tahun')
     if start_date:
         mutation_query = mutation_query.filter(journal__tanggal__gte=start_date)
+    # Filter include/exclude jurnal penutup HANYA berlaku untuk mutasi di periode terpilih
+    if not include_closing:
+        mutation_query = mutation_query.exclude(journal__transaksi='jurnal_tutup_tahun')
 
     mutation_rows = (
         mutation_query.values('perkiraan')
