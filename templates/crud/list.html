@@ -64,10 +64,24 @@
     </table>
 </div>
 {% if is_paginated %}
-<div class="mt-4 flex gap-2 text-sm">
-    {% if page_obj.has_previous %}<a class="rounded border px-3 py-2" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Sebelumnya</a>{% endif %}
-    <span class="rounded border bg-white px-3 py-2">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}<a class="rounded border px-3 py-2" href="?page={{ page_obj.next_page_number }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Berikutnya</a>{% endif %}
+<div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+    <div class="flex items-center gap-1">
+        {% if page_obj.number > 1 %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page=1&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Pertama</a>
+        {% endif %}
+        {% if page_obj.has_previous %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Sebelumnya</a>
+        {% endif %}
+    </div>
+    <span class="rounded border bg-white px-3 py-2 font-medium">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    <div class="flex items-center gap-1">
+        {% if page_obj.has_next %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.next_page_number }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Berikutnya</a>
+        {% endif %}
+        {% if page_obj.number < page_obj.paginator.num_pages %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.paginator.num_pages }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Terakhir</a>
+        {% endif %}
+    </div>
 </div>
 {% endif %}
 {% endblock %}
