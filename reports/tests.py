@@ -333,3 +333,50 @@ class ReportLayoutTests(TestCase):
         res = self.client.get('/reports/neraca-saldo/', {'start_date': '2025-06-01', 'end_date': '2027-06-30'})
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'Periode Neraca Saldo harus berada pada tahun yang sama.')
+
+    def test_rekap_transaksi_kas_pagination_full_export_and_same_year_validation(self):
+        tenant = Tenant.objects.create(name='CV Kas Test')
+        user = get_user_model().objects.create_user(username='admin-kas-test')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        kas = ChartOfAccount.objects.create(tenant=tenant, kode='101', nama='Kas', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        biaya = ChartOfAccount.objects.create(tenant=tenant, kode='501', nama='Biaya', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        bank = BankAccount.objects.create(tenant=tenant, no_rekening='001', nama_bank='Kas Utama', atas_nama='CV Kas Test', akun=kas)
+
+        from finance.models import CashTransaction
+        for i in range(25):
+            CashTransaction.objects.create(
+                tenant=tenant,
+                no_bukti=f'KAS-{i+1}',
+                tanggal=date(2026, 7, 1),
+                akun_kas=kas,
+                akun_transaksi=biaya,
+                bank=bank,
+                nominal_keluar=Decimal('1000'),
+                created_by=user,
+            )
+
+        self.client.force_login(user)
+
+        # 1. HTML View paginates (page 1 contains 20 items, is_paginated is True, navigation contains 'Pertama' and 'Terakhir')
+        res_p1 = self.client.get('/reports/rekap-transaksi-kas/', {'start_date': '2026-07-01', 'end_date': '2026-07-31'})
+        self.assertEqual(res_p1.status_code, 200)
+        self.assertTrue(res_p1.context['is_paginated'])
+        self.assertEqual(len(res_p1.context['rows']), 20)
+        self.assertContains(res_p1, 'Berikutnya')
+        self.assertContains(res_p1, 'Terakhir')
+
+        # Page 2 contains remaining 5 items
+        res_p2 = self.client.get('/reports/rekap-transaksi-kas/', {'start_date': '2026-07-01', 'end_date': '2026-07-31', 'page': '2'})
+        self.assertEqual(res_p2.status_code, 200)
+        self.assertEqual(len(res_p2.context['rows']), 5)
+        self.assertContains(res_p2, 'Pertama')
+        self.assertContains(res_p2, 'Sebelumnya')
+
+        # 2. Export Excel exports ALL 25 items in period
+        res_excel = self.client.get('/reports/rekap-transaksi-kas/', {'start_date': '2026-07-01', 'end_date': '2026-07-31', 'export': 'excel'})
+        self.assertEqual(res_excel.status_code, 200)
+
+        # 3. Same-year validation warning when start_date.year != end_date.year
+        res_diff_year = self.client.get('/reports/rekap-transaksi-kas/', {'start_date': '2025-06-01', 'end_date': '2026-06-30'})
+        self.assertEqual(res_diff_year.status_code, 200)
+        self.assertContains(res_diff_year, 'Periode Rekap Transaksi Kas harus berada pada tahun yang sama.')

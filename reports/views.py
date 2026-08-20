@@ -282,6 +282,10 @@ def saldo_bank(request):
 def rekap_transaksi_kas(request):
     require_tenant(request)
     filters = month_report_filters(request)
+    if filters['start_date'].year != filters['end_date'].year:
+        from django.contrib import messages
+        messages.warning(request, 'Periode Rekap Transaksi Kas harus berada pada tahun yang sama.')
+        filters['end_date'] = date(filters['start_date'].year, 12, 31)
     rows = services.rekap_transaksi_kas(request.tenant, filters['start_date'], filters['end_date'])
     if request.GET.get('export') in {'excel', 'pdf'}:
         headers = ['No', 'Tanggal', 'Account & Keterangan', 'Keluar', 'Masuk', 'Pc']
@@ -335,7 +339,24 @@ def rekap_transaksi_kas(request):
             ],
             header_rgb=(0.71, 0.82, 0.91),
         )
-    return render(request, 'reports/rekap_transaksi_kas.html', {'title': 'Rekap Transaksi Kas', 'rows': rows, 'export_excel_pdf': True, **filters})
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    total_keluar = sum((row.nominal_keluar for row in rows), ZERO)
+    total_masuk = sum((row.nominal_masuk for row in rows), ZERO)
+    return render(
+        request,
+        'reports/rekap_transaksi_kas.html',
+        {
+            'title': 'Rekap Transaksi Kas',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_keluar': total_keluar,
+            'total_masuk': total_masuk,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )
 
 @login_required
 def riwayat_pembelian_bbm(request):

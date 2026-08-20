@@ -21,7 +21,7 @@
         <tbody class="divide-y divide-slate-100">
             {% for row in rows %}
             <tr>
-                <td class="px-4 py-3">{{ forloop.counter }}</td>
+                <td class="px-4 py-3">{% if page_obj %}{{ forloop.counter|add:page_obj.start_index|add:"-1" }}{% else %}{{ forloop.counter }}{% endif %}</td>
                 <td class="px-4 py-3">{{ row.tanggal|date:"d/m/Y" }}</td>
                 <td class="px-4 py-3">{{ row.akun_transaksi.kode }} {{ row.akun_transaksi.nama }}{% if row.armada %},{{ row.armada.kendaraan }}{% endif %}<br><span class="text-slate-500">{{ row.keterangan }}</span></td>
                 <td class="px-4 py-3 text-right">{{ row.nominal_keluar|format_money }}</td>
@@ -35,11 +35,33 @@
         <tfoot class="border-t bg-slate-50 font-semibold">
             <tr>
                 <td class="px-4 py-3 text-right" colspan="3">Total</td>
-                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"nominal_keluar" }}</td>
-                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"nominal_masuk" }}</td>
+                <td class="px-4 py-3 text-right">{{ total_keluar|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ total_masuk|format_money }}</td>
                 <td class="px-4 py-3"></td>
             </tr>
         </tfoot>
     </table>
 </div>
+
+{% if is_paginated %}
+<div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+    <div class="flex items-center gap-1">
+        {% if page_obj.number > 1 %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page=1&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Pertama</a>
+        {% endif %}
+        {% if page_obj.has_previous %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.previous_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Sebelumnya</a>
+        {% endif %}
+    </div>
+    <span class="rounded border bg-white px-3 py-2 font-medium">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    <div class="flex items-center gap-1">
+        {% if page_obj.has_next %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.next_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Berikutnya</a>
+        {% endif %}
+        {% if page_obj.number < page_obj.paginator.num_pages %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.paginator.num_pages }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Terakhir</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}
