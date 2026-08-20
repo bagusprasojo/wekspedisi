@@ -47,16 +47,20 @@ class ArmadaForm(forms.ModelForm):
         cleaned = super().clean()
         driver_text = (cleaned.get('driver_text') or '').strip()
         driver = cleaned.get('driver')
-        if driver_text and not driver:
-            candidates = list(self.fields['driver'].queryset)
-            driver = next((item for item in candidates if str(item) == driver_text), None)
-            if not driver and ' - ' in driver_text:
-                kode = driver_text.split(' - ', 1)[0].strip()
-                driver = next((item for item in candidates if item.kode == kode), None)
-            if driver:
-                cleaned['driver'] = driver
-            else:
-                self.add_error('driver_text', 'Driver harus dipilih dari daftar autocomplete.')
+
+        if not driver_text:
+            cleaned['driver'] = None
+        else:
+            if not driver or str(driver) != driver_text:
+                candidates = list(self.fields['driver'].queryset)
+                matched = next((item for item in candidates if str(item) == driver_text), None)
+                if not matched and ' - ' in driver_text:
+                    kode = driver_text.split(' - ', 1)[0].strip()
+                    matched = next((item for item in candidates if item.kode == kode), None)
+                if matched:
+                    cleaned['driver'] = matched
+                elif driver and str(driver) != driver_text:
+                    self.add_error('driver_text', 'Driver harus dipilih dari daftar autocomplete.')
         return cleaned
 
 

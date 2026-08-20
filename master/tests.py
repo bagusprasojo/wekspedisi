@@ -72,6 +72,39 @@ class StakeHolderLegacyShapeTests(TestCase):
         armada = Armada.objects.get(nopol='B 9999 XYZ')
         self.assertEqual(armada.driver, karyawan)
 
+    def test_armada_update_view_can_change_and_clear_driver(self):
+        driver1 = StakeHolder.objects.create(tenant=self.tenant, kode='K001', nama='Driver Satu', jenis=StakeHolder.StakeHolderType.KARYAWAN)
+        driver2 = StakeHolder.objects.create(tenant=self.tenant, kode='K002', nama='Driver Dua', jenis=StakeHolder.StakeHolderType.KARYAWAN)
+        armada = Armada.objects.create(tenant=self.tenant, nopol='B 1234 EDIT', kendaraan='Truk', driver=driver1)
+
+        user = get_user_model().objects.create_user(username='admin-armada-edit')
+        UserProfile.objects.create(user=user, tenant=self.tenant, role=UserProfile.Role.ADMIN)
+        self.client.force_login(user)
+
+        # 1. Change driver to driver2
+        res = self.client.post(f'/master/armada/{armada.uuid}/edit/', {
+            'nopol': 'B 1234 EDIT',
+            'kendaraan': 'Truk',
+            'pemilik': 'CV Test',
+            'driver': str(driver1.pk),
+            'driver_text': driver2.nama,
+        })
+        self.assertEqual(res.status_code, 302)
+        armada.refresh_from_db()
+        self.assertEqual(armada.driver, driver2)
+
+        # 2. Clear driver to None
+        res2 = self.client.post(f'/master/armada/{armada.uuid}/edit/', {
+            'nopol': 'B 1234 EDIT',
+            'kendaraan': 'Truk',
+            'pemilik': 'CV Test',
+            'driver': str(driver2.pk),
+            'driver_text': '',
+        })
+        self.assertEqual(res2.status_code, 302)
+        armada.refresh_from_db()
+        self.assertIsNone(armada.driver)
+
 class BankAccountDetailUxTests(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name='CV Test')
