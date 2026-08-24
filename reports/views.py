@@ -272,11 +272,71 @@ def neraca_saldo(request):
 def saldo_bank(request):
     require_tenant(request)
     filters = report_filters(request)
-    rows = services.saldo_bank(request.tenant, filters['end_date'])
+    end_date = filters['end_date'] or date.today()
+    filters['end_date'] = end_date
+    first_of_month = end_date.replace(day=1)
+    rows = services.saldo_bank(request.tenant, end_date)
+    total_saldo = sum((row['saldo'] for row in rows), ZERO)
+    period = f"s.d. {end_date.strftime('%d/%m/%Y')}"
+
+    if request.GET.get('export') in {'excel', 'pdf'}:
+        headers = ['No', 'Bank/Kas', 'No Rekening', 'Atas Nama', 'Kode Akun', 'Saldo']
+        export_rows = [
+            [
+                (index, 'number'),
+                (row['bank'].nama_bank, 'text'),
+                (row['bank'].no_rekening, 'text'),
+                (row['bank'].atas_nama, 'text'),
+                (row['akun'].kode if row['akun'] else '', 'center'),
+                (row['saldo'], 'number'),
+            ]
+            for index, row in enumerate(rows, start=1)
+        ]
+        totals = [('Total', 'text', 5), (total_saldo, 'number', 1)]
+        if request.GET.get('export') == 'excel':
+            return legacy_report_excel_response(
+                'saldo-bank.xls',
+                'Saldo Bank Kas',
+                request.tenant,
+                period,
+                headers,
+                export_rows,
+                totals,
+            )
+        return legacy_report_pdf_response(
+            'saldo-bank.pdf',
+            'Saldo Bank/Kas',
+            request.tenant,
+            period,
+            [
+                {'label': 'No', 'x': 0, 'w': 32, 'max': 4},
+                {'label': 'Bank/Kas', 'x': 32, 'w': 140, 'max': 24},
+                {'label': 'No Rekening', 'x': 172, 'w': 110, 'max': 18},
+                {'label': 'Atas Nama', 'x': 282, 'w': 150, 'max': 25},
+                {'label': 'Kode', 'x': 432, 'w': 50, 'max': 8},
+                {'label': 'Saldo', 'x': 482, 'w': 72, 'max': 12},
+            ],
+            export_rows,
+            [(0, 482, 'Total  ', 'text', 5), (482, 72, total_saldo, 'number', 1)],
+        )
+
     if request.GET.get('export') == 'csv':
-        csv_rows = [[row['bank'].nama_bank, row['bank'].no_rekening, row['bank'].atas_nama, row['akun'].kode, row['saldo']] for row in rows]
-        return csv_response('saldo-bank.csv', ['Bank/Kas', 'No Rekening', 'Atas Nama', 'Kode Akun', 'Saldo'], csv_rows)
-    return render(request, 'reports/saldo_bank.html', {'title': 'Saldo Bank/Kas', 'rows': rows, **filters})
+        csv_rows = [[index, row['bank'].nama_bank, row['bank'].no_rekening, row['bank'].atas_nama, row['akun'].kode if row['akun'] else '', row['saldo']] for index, row in enumerate(rows, start=1)]
+        csv_rows.append(['', '', '', '', 'Total', total_saldo])
+        return csv_response('saldo-bank.csv', ['No', 'Bank/Kas', 'No Rekening', 'Atas Nama', 'Kode Akun', 'Saldo'], csv_rows)
+
+    return render(
+        request,
+        'reports/saldo_bank.html',
+        {
+            'title': 'Saldo Bank/Kas',
+            'rows': rows,
+            'total_saldo': total_saldo,
+            'first_of_month': first_of_month,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )
 
 @login_required
 def rekap_transaksi_kas(request):
@@ -591,10 +651,27 @@ def rekening_koran(request):
             extra_lines=extra_lines,
             landscape=True,
         )
+    paginator = Paginator(display_rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    total_debet = sum((r['debet'] for r in rows), ZERO)
+    total_kredit = sum((r['kredit'] for r in rows), ZERO)
     return render(
         request,
         'reports/rekening_koran.html',
-        {'title': 'Rekening Koran', 'rows': display_rows, 'banks': banks, 'selected_bank': bank, 'saldo_awal': saldo_awal, **filters},
+        {
+            'title': 'Rekening Koran',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_debet': total_debet,
+            'total_kredit': total_kredit,
+            'final_saldo': running,
+            'banks': banks,
+            'selected_bank': bank,
+            'saldo_awal': saldo_awal,
+            'export_excel_pdf': True,
+            **filters,
+        },
     )
 
 @login_required

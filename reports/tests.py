@@ -425,3 +425,76 @@ class ReportLayoutTests(TestCase):
         res_diff_year = self.client.get('/reports/rekap-transaksi-bank/', {'start_date': '2025-06-01', 'end_date': '2026-06-30'})
         self.assertEqual(res_diff_year.status_code, 200)
         self.assertContains(res_diff_year, 'Periode Rekap Transaksi Bank harus berada pada tahun yang sama.')
+
+    def test_saldo_bank_report_enhancements(self):
+        tenant = Tenant.objects.create(name='CV Saldo Test')
+        user = get_user_model().objects.create_user(username='admin-saldo-test')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        kas = ChartOfAccount.objects.create(tenant=tenant, kode='101', nama='Bank Utama', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        bank = BankAccount.objects.create(tenant=tenant, no_rekening='001', nama_bank='Bank Utama', atas_nama='CV Saldo Test', akun=kas)
+
+        self.client.force_login(user)
+
+        # HTML view has No column, total_saldo, format_money, and default today end_date & link to Rekening Koran
+        res_default = self.client.get('/reports/saldo-bank/')
+        self.assertEqual(res_default.status_code, 200)
+        today_str = date.today().strftime('%Y-%m-%d')
+        first_of_month_str = date.today().replace(day=1).strftime('%Y-%m-%d')
+        self.assertContains(res_default, f'value="{today_str}"')
+        self.assertContains(res_default, f'/reports/rekening-koran/?bank={bank.pk}&start_date={first_of_month_str}&end_date={today_str}')
+
+        res = self.client.get('/reports/saldo-bank/', {'end_date': '2026-08-31'})
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Total Saldo')
+        self.assertContains(res, 'Export Excel')
+        self.assertContains(res, 'Export PDF')
+        self.assertContains(res, f'/reports/rekening-koran/?bank={bank.pk}&start_date=2026-08-01&end_date=2026-08-31')
+
+        # Export Excel returns 200
+        res_excel = self.client.get('/reports/saldo-bank/', {'end_date': '2026-08-31', 'export': 'excel'})
+        self.assertEqual(res_excel.status_code, 200)
+
+    def test_rekening_koran_pagination_and_running_balance(self):
+        tenant = Tenant.objects.create(name='CV RK Test')
+        user = get_user_model().objects.create_user(username='admin-rk-test')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        kas = ChartOfAccount.objects.create(tenant=tenant, kode='101', nama='Bank Utama', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        bank = BankAccount.objects.create(tenant=tenant, no_rekening='001', nama_bank='Bank Utama', atas_nama='CV RK Test', akun=kas)
+        from master.models import TransactionType
+        jenis = TransactionType.objects.create(tenant=tenant, kode='01', nama='Setoran Tunai', akun=kas)
+
+        from finance.models import BankTransaction
+        for i in range(25):
+            BankTransaction.objects.create(
+                tenant=tenant,
+                no_bukti=f'BNK-{i+1}',
+                tanggal=date(2026, 7, 1),
+                bank_utama=bank,
+                jenis_transaksi=jenis,
+                debet=Decimal('0'),
+                kredit=Decimal('1000'),
+                created_by=user,
+            )
+
+        self.client.force_login(user)
+
+        # Page 1 contains 20 rows, first row running balance 1000, row 20 running balance 20000
+        res_p1 = self.client.get('/reports/rekening-koran/', {'bank': bank.pk, 'start_date': '2026-07-01', 'end_date': '2026-07-31'})
+        self.assertEqual(res_p1.status_code, 200)
+        self.assertTrue(res_p1.context['is_paginated'])
+        self.assertEqual(len(res_p1.context['rows']), 20)
+        self.assertEqual(res_p1.context['rows'][0]['saldo'], Decimal('1000'))
+        self.assertEqual(res_p1.context['rows'][19]['saldo'], Decimal('20000'))
+        self.assertContains(res_p1, 'Berikutnya')
+
+        # Page 2 contains remaining 5 rows, row 1 (index 21) running balance 21000, row 5 (index 25) running balance 25000
+        res_p2 = self.client.get('/reports/rekening-koran/', {'bank': bank.pk, 'start_date': '2026-07-01', 'end_date': '2026-07-31', 'page': '2'})
+        self.assertEqual(res_p2.status_code, 200)
+        self.assertEqual(len(res_p2.context['rows']), 5)
+        self.assertEqual(res_p2.context['rows'][0]['saldo'], Decimal('21000'))
+        self.assertEqual(res_p2.context['rows'][4]['saldo'], Decimal('25000'))
+        self.assertContains(res_p2, 'Pertama')
+
+        # Export Excel exports all 25 rows
+        res_excel = self.client.get('/reports/rekening-koran/', {'bank': bank.pk, 'start_date': '2026-07-01', 'end_date': '2026-07-31', 'export': 'excel'})
+        self.assertEqual(res_excel.status_code, 200)

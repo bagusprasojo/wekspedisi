@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load crud_extras %}
 
 {% block title %}{{ title }}{% endblock %}
 {% block page_title %}{{ title }}{% endblock %}
@@ -10,12 +11,15 @@
         <input class="rounded border px-3 py-2 text-sm" id="end_date" name="end_date" type="date" value="{{ end_date|date:'Y-m-d' }}">
     </div>
     <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Tampilkan</button>
-    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="csv">Export CSV</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="excel">Export Excel</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>
 </form>
+
 <div class="overflow-hidden rounded border bg-white">
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-100 text-left text-slate-600">
             <tr>
+                <th class="px-4 py-3 font-medium">No</th>
                 <th class="px-4 py-3 font-medium">Bank/Kas</th>
                 <th class="px-4 py-3 font-medium">No Rekening</th>
                 <th class="px-4 py-3 font-medium">Atas Nama</th>
@@ -25,17 +29,26 @@
         </thead>
         <tbody class="divide-y divide-slate-100">
             {% for row in rows %}
-            <tr>
-                <td class="px-4 py-3">{{ row.bank.nama_bank }}</td>
-                <td class="px-4 py-3">{{ row.bank.no_rekening }}</td>
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3">{{ forloop.counter }}</td>
+                <td class="px-4 py-3 font-medium text-slate-900">{{ row.bank.nama_bank }}</td>
+                <td class="px-4 py-3 font-mono text-xs"><a class="font-semibold text-blue-600 underline hover:text-blue-800" href="{% url 'reports_rekening_koran' %}?bank={{ row.bank.pk }}&start_date={{ first_of_month|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" title="Lihat Rekening Koran">{{ row.bank.no_rekening }}</a></td>
                 <td class="px-4 py-3">{{ row.bank.atas_nama }}</td>
-                <td class="px-4 py-3">{{ row.akun }}</td>
-                <td class="px-4 py-3 text-right">{{ row.saldo }}</td>
+                <td class="px-4 py-3 font-mono text-xs">{{ row.akun.kode|default:row.akun }}</td>
+                <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ row.saldo|format_money }}</td>
             </tr>
             {% empty %}
-            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="5">Belum ada data.</td></tr>
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="6">Belum ada data.</td></tr>
             {% endfor %}
         </tbody>
+        {% if rows %}
+        <tfoot class="border-t bg-slate-50 font-semibold">
+            <tr>
+                <td class="px-4 py-3 text-right" colspan="5">Total Saldo</td>
+                <td class="px-4 py-3 text-right font-bold text-emerald-600">{{ total_saldo|format_money }}</td>
+            </tr>
+        </tfoot>
+        {% endif %}
     </table>
 </div>
 {% endblock %}

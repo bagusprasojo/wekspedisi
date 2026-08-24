@@ -59,19 +59,52 @@
         <tbody class="divide-y divide-slate-100">
             {% for row in rows %}
             <tr class="hover:bg-slate-50">
-                <td class="whitespace-nowrap px-4 py-3">{{ forloop.counter }}</td>
+                <td class="whitespace-nowrap px-4 py-3">{% if page_obj %}{{ forloop.counter|add:page_obj.start_index|add:"-1" }}{% else %}{{ forloop.counter }}{% endif %}</td>
                 <td class="whitespace-nowrap px-4 py-3">{{ row.tanggal|date:"d/m/Y" }}</td>
                 <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ row.kode }}</td>
                 <td class="whitespace-nowrap px-4 py-3">{{ row.uraian }}</td>
                 <td class="whitespace-nowrap px-4 py-3 text-right">{{ row.debet|format_money }}</td>
                 <td class="whitespace-nowrap px-4 py-3 text-right">{{ row.kredit|format_money }}</td>
-                <td class="whitespace-nowrap px-4 py-3 text-right">{{ row.saldo|format_money }}</td>
+                <td class="whitespace-nowrap px-4 py-3 text-right font-semibold text-slate-900">{{ row.saldo|format_money }}</td>
                 <td class="whitespace-nowrap px-4 py-3">{{ row.user_create }}</td>
             </tr>
             {% empty %}
             <tr><td class="px-4 py-6 text-center text-slate-500" colspan="8">{% if selected_bank %}Belum ada data.{% else %}Pilih no rekening dulu.{% endif %}</td></tr>
             {% endfor %}
         </tbody>
+        {% if rows %}
+        <tfoot class="border-t bg-slate-50 font-semibold">
+            <tr>
+                <td class="px-4 py-3 text-right" colspan="4">Total Mutasi & Saldo Akhir</td>
+                <td class="px-4 py-3 text-right">{{ total_debet|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ total_kredit|format_money }}</td>
+                <td class="px-4 py-3 text-right font-bold text-emerald-600">{{ final_saldo|format_money }}</td>
+                <td class="px-4 py-3"></td>
+            </tr>
+        </tfoot>
+        {% endif %}
     </table>
 </div>
+
+{% if is_paginated %}
+<div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+    <div class="flex items-center gap-1">
+        {% if page_obj.number > 1 %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page=1&bank={{ selected_bank.pk|default:'' }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Pertama</a>
+        {% endif %}
+        {% if page_obj.has_previous %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.previous_page_number }}&bank={{ selected_bank.pk|default:'' }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Sebelumnya</a>
+        {% endif %}
+    </div>
+    <span class="rounded border bg-white px-3 py-2 font-medium">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    <div class="flex items-center gap-1">
+        {% if page_obj.has_next %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.next_page_number }}&bank={{ selected_bank.pk|default:'' }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Berikutnya</a>
+        {% endif %}
+        {% if page_obj.number < page_obj.paginator.num_pages %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.paginator.num_pages }}&bank={{ selected_bank.pk|default:'' }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Terakhir</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}
