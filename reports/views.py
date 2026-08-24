@@ -678,6 +678,10 @@ def rekening_koran(request):
 def rekap_transaksi_kas_bon(request):
     require_tenant(request)
     filters = month_report_filters(request)
+    if filters['start_date'].year != filters['end_date'].year:
+        from django.contrib import messages
+        messages.warning(request, 'Periode Rekap Transaksi Kas Bon harus berada pada tahun yang sama.')
+        filters['end_date'] = date(filters['start_date'].year, 12, 31)
     rows = services.rekap_transaksi_kas_bon(request.tenant, filters['start_date'], filters['end_date'])
     if request.GET.get('export') in {'excel', 'pdf'}:
         period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
@@ -727,7 +731,24 @@ def rekap_transaksi_kas_bon(request):
             [(0, 350, 'Grand Total', 'text', 5), (350, 90, sum((row['keluar'] for row in rows), ZERO), 'number', 1), (440, 82, sum((row['masuk'] for row in rows), ZERO), 'number', 1), (522, 32, '', 'text', 1)],
             header_rgb=(0.90, 0.95, 0.98),
         )
-    return render(request, 'reports/rekap_transaksi_kas_bon.html', {'title': 'Rekap Transaksi Kas Bon', 'rows': rows, 'export_excel_pdf': True, **filters})
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    total_keluar = sum((row['keluar'] for row in rows), ZERO)
+    total_masuk = sum((row['masuk'] for row in rows), ZERO)
+    return render(
+        request,
+        'reports/rekap_transaksi_kas_bon.html',
+        {
+            'title': 'Rekap Transaksi Kas Bon',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_keluar': total_keluar,
+            'total_masuk': total_masuk,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )
 
 @login_required
 def saldo_kas_bon(request):
@@ -789,6 +810,10 @@ def saldo_kas_bon(request):
 def rekap_invoice_customer(request):
     require_tenant(request)
     filters = month_report_filters(request)
+    if filters['start_date'].year != filters['end_date'].year:
+        from django.contrib import messages
+        messages.warning(request, 'Periode Rekap Invoice Customer harus berada pada tahun yang sama.')
+        filters['end_date'] = date(filters['start_date'].year, 12, 31)
     rows = services.rekap_invoice_customer(request.tenant, filters['start_date'], filters['end_date'])
     if request.GET.get('export') in {'excel', 'pdf'}:
         period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
@@ -839,7 +864,30 @@ def rekap_invoice_customer(request):
             [[*row[:8], row[9]] for row in export_rows],
             [(0, 336, 'Grand Total', 'text', 5), (336, 54, sum((row.nilai_pekerjaan for row in rows), ZERO), 'number', 1), (390, 50, sum((row.ppn for row in rows), ZERO), 'number', 1), (440, 58, sum((row.total for row in rows), ZERO), 'number', 1), (498, 58, sum((row.saldo for row in rows), ZERO), 'number', 1)],
         )
-    return render(request, 'reports/rekap_invoice_customer.html', {'title': 'Rekap Invoice Customer', 'rows': rows, 'export_excel_pdf': True, **filters})
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    total_dpp = sum((row.nilai_pekerjaan for row in rows), ZERO)
+    total_ppn = sum((row.ppn for row in rows), ZERO)
+    total_total = sum((row.total for row in rows), ZERO)
+    total_pelunasan = sum((row.pelunasan for row in rows), ZERO)
+    total_saldo = sum((row.saldo for row in rows), ZERO)
+    return render(
+        request,
+        'reports/rekap_invoice_customer.html',
+        {
+            'title': 'Rekap Invoice Customer',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_dpp': total_dpp,
+            'total_ppn': total_ppn,
+            'total_total': total_total,
+            'total_pelunasan': total_pelunasan,
+            'total_saldo': total_saldo,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )
 
 @login_required
 def rekap_pembayaran_invoice_customer(request):

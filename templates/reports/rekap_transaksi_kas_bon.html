@@ -26,11 +26,11 @@
             {% for group in grouped_rows %}
             <tr class="bg-slate-50 font-semibold"><td class="px-4 py-2" colspan="9">{{ group.grouper }}</td></tr>
             {% for row in group.list %}
-            <tr>
-                <td class="px-4 py-3">{{ forloop.counter }}</td>
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3">{% if page_obj %}{{ forloop.counter|add:page_obj.start_index|add:"-1" }}{% else %}{{ forloop.counter }}{% endif %}</td>
                 <td class="px-4 py-3">{{ row.tanggal|date:"d/m/Y" }}</td>
-                <td class="px-4 py-3">{{ row.karyawan }}</td>
-                <td class="px-4 py-3">{{ row.no_register }}</td>
+                <td class="px-4 py-3 font-medium text-slate-900">{{ row.karyawan }}</td>
+                <td class="px-4 py-3 font-mono text-xs">{{ row.no_register }}</td>
                 <td class="px-4 py-3">{{ row.akun_kas }}</td>
                 <td class="px-4 py-3">{{ row.keterangan }}</td>
                 <td class="px-4 py-3 text-right">{{ row.keluar|format_money }}</td>
@@ -51,11 +51,33 @@
         <tfoot class="border-t bg-slate-100 font-semibold">
             <tr>
                 <td class="px-4 py-3 text-right" colspan="6">Grand Total</td>
-                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"keluar" }}</td>
-                <td class="px-4 py-3 text-right">{{ rows|sum_attr:"masuk" }}</td>
+                <td class="px-4 py-3 text-right">{{ total_keluar|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ total_masuk|format_money }}</td>
                 <td class="px-4 py-3"></td>
             </tr>
         </tfoot>
     </table>
 </div>
+
+{% if is_paginated %}
+<div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+    <div class="flex items-center gap-1">
+        {% if page_obj.number > 1 %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page=1&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Pertama</a>
+        {% endif %}
+        {% if page_obj.has_previous %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.previous_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Sebelumnya</a>
+        {% endif %}
+    </div>
+    <span class="rounded border bg-white px-3 py-2 font-medium">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    <div class="flex items-center gap-1">
+        {% if page_obj.has_next %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.next_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Berikutnya</a>
+        {% endif %}
+        {% if page_obj.number < page_obj.paginator.num_pages %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.paginator.num_pages }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}">Terakhir</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 {% endblock %}
