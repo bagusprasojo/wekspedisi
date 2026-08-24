@@ -893,6 +893,10 @@ def rekap_invoice_customer(request):
 def rekap_pembayaran_invoice_customer(request):
     require_tenant(request)
     filters = month_report_filters(request)
+    if filters['start_date'].year != filters['end_date'].year:
+        from django.contrib import messages
+        messages.warning(request, 'Periode Rekap Pembayaran Invoice Customer harus berada pada tahun yang sama.')
+        filters['end_date'] = date(filters['start_date'].year, 12, 31)
     rows = services.rekap_pembayaran_invoice_customer(request.tenant, filters['start_date'], filters['end_date'])
     if request.GET.get('export') in {'excel', 'pdf'}:
         period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
@@ -934,4 +938,23 @@ def rekap_pembayaran_invoice_customer(request):
             [row[:9] for row in export_rows],
             [(0, 396, 'Grand Total', 'text', 6), (396, 60, sum((row.nominal_kas for row in rows), ZERO), 'number', 1), (456, 48, sum((row.pph for row in rows), ZERO), 'number', 1), (504, 52, sum((row.total_pembayaran for row in rows), ZERO), 'number', 1)],
         )
-    return render(request, 'reports/rekap_pembayaran_invoice_customer.html', {'title': 'Rekap Pembayaran Invoice Customer', 'rows': rows, 'export_excel_pdf': True, **filters})
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    total_nominal_kas = sum((row.nominal_kas for row in rows), ZERO)
+    total_pph = sum((row.pph for row in rows), ZERO)
+    total_pembayaran = sum((row.total_pembayaran for row in rows), ZERO)
+    return render(
+        request,
+        'reports/rekap_pembayaran_invoice_customer.html',
+        {
+            'title': 'Rekap Pembayaran Invoice Customer',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_nominal_kas': total_nominal_kas,
+            'total_pph': total_pph,
+            'total_pembayaran': total_pembayaran,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )

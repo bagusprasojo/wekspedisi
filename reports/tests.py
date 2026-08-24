@@ -600,3 +600,64 @@ class ReportLayoutTests(TestCase):
         res_diff_year = self.client.get('/reports/rekap-invoice-customer/', {'start_date': '2025-06-01', 'end_date': '2026-06-30'})
         self.assertEqual(res_diff_year.status_code, 200)
         self.assertContains(res_diff_year, 'Periode Rekap Invoice Customer harus berada pada tahun yang sama.')
+
+    def test_rekap_pembayaran_invoice_customer_pagination_full_export_and_same_year_validation(self):
+        tenant = Tenant.objects.create(name='CV Pay Test')
+        user = get_user_model().objects.create_user(username='admin-pay-test')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        kas = ChartOfAccount.objects.create(tenant=tenant, kode='101', nama='Kas Utama', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        piutang = ChartOfAccount.objects.create(tenant=tenant, kode='112', nama='Piutang Jasa', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        pendapatan = ChartOfAccount.objects.create(tenant=tenant, kode='401', nama='Pendapatan Jasa', saldo_normal=ChartOfAccount.NormalBalance.KREDIT)
+        ppn_acc = ChartOfAccount.objects.create(tenant=tenant, kode='211', nama='PPN Keluaran', saldo_normal=ChartOfAccount.NormalBalance.KREDIT)
+        bank = BankAccount.objects.create(tenant=tenant, no_rekening='001', nama_bank='Kas Utama', atas_nama='CV Pay Test', akun=kas)
+
+        from master.models import TenantConfig
+        TenantConfig.objects.create(tenant=tenant, kode='PIUTANG_JASA_ID', nilai=str(piutang.pk))
+        TenantConfig.objects.create(tenant=tenant, kode='AKUN_PENDAPATAN_JASA', nilai=str(pendapatan.pk))
+        TenantConfig.objects.create(tenant=tenant, kode='AKUN_PPN_ID', nilai=str(ppn_acc.pk))
+        TenantConfig.objects.create(tenant=tenant, kode='INVOICE_CODE', nilai='INV_TEST')
+        TenantConfig.objects.create(tenant=tenant, kode='INVOICE_ADMIN_NAME', nilai='Admin Test')
+        TenantConfig.objects.create(tenant=tenant, kode='INVOICE_PAYMENT_TEXT', nilai='BCA 1234')
+
+        customer = StakeHolder.objects.create(tenant=tenant, kode='CUS-10', nama='Customer A', jenis=StakeHolder.StakeHolderType.CUSTOMER)
+
+        from invoice.models import CustomerInvoice, CustomerInvoicePayment
+        inv = CustomerInvoice(
+            tenant=tenant,
+            customer=customer,
+            tanggal=date(2026, 7, 1),
+            pekerjaan='Angkut barang',
+            nilai_pekerjaan=Decimal('100000000'),
+        ).save_with_business_rules(user=user)
+
+        for i in range(25):
+            CustomerInvoicePayment(
+                tenant=tenant,
+                tagihan_customer=inv,
+                tanggal=date(2026, 7, 1),
+                bank=bank,
+                nominal_kas=Decimal('1000000'),
+            ).save_with_business_rules(user=user)
+
+        self.client.force_login(user)
+
+        # 1. HTML View paginates (page 1 has 20 rows, page 2 has 5 rows)
+        res_p1 = self.client.get('/reports/rekap-pembayaran-invoice-customer/', {'start_date': '2026-07-01', 'end_date': '2026-07-31'})
+        self.assertEqual(res_p1.status_code, 200)
+        self.assertTrue(res_p1.context['is_paginated'])
+        self.assertEqual(len(res_p1.context['rows']), 20)
+        self.assertContains(res_p1, 'Berikutnya')
+
+        res_p2 = self.client.get('/reports/rekap-pembayaran-invoice-customer/', {'start_date': '2026-07-01', 'end_date': '2026-07-31', 'page': '2'})
+        self.assertEqual(res_p2.status_code, 200)
+        self.assertEqual(len(res_p2.context['rows']), 5)
+        self.assertContains(res_p2, 'Pertama')
+
+        # 2. Export Excel exports ALL 25 rows
+        res_excel = self.client.get('/reports/rekap-pembayaran-invoice-customer/', {'start_date': '2026-07-01', 'end_date': '2026-07-31', 'export': 'excel'})
+        self.assertEqual(res_excel.status_code, 200)
+
+        # 3. Same-year validation warning when period spans across years
+        res_diff_year = self.client.get('/reports/rekap-pembayaran-invoice-customer/', {'start_date': '2025-06-01', 'end_date': '2026-06-30'})
+        self.assertEqual(res_diff_year.status_code, 200)
+        self.assertContains(res_diff_year, 'Periode Rekap Pembayaran Invoice Customer harus berada pada tahun yang sama.')

@@ -49,12 +49,12 @@ class TenantQuerysetMixin(TenantRequiredMixin):
             try:
                 s_date = timezone.datetime.strptime(start_date, '%Y-%m-%d').date()
                 e_date = timezone.datetime.strptime(end_date, '%Y-%m-%d').date()
-                if s_date.year != e_date.year:
-                    from django.contrib import messages
-                    title_name = getattr(self, 'config', None).title if hasattr(self, 'config') and getattr(self, 'config', None) else 'data'
-                    messages.warning(self.request, f'Periode filter {title_name} harus berada pada tahun yang sama.')
-                    e_date = s_date.replace(month=12, day=31)
-                    end_date = e_date.isoformat()
+                # if s_date.year != e_date.year:
+                #     from django.contrib import messages
+                #     title_name = getattr(self, 'config', None).title if hasattr(self, 'config') and getattr(self, 'config', None) else 'data'
+                #     messages.warning(self.request, f'Periode filter {title_name} harus berada pada tahun yang sama.')
+                #     e_date = s_date.replace(month=12, day=31)
+                #     end_date = e_date.isoformat()
             except (ValueError, TypeError):
                 pass
             self.effective_start_date = start_date

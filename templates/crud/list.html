@@ -24,8 +24,6 @@
         <button class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" type="submit">Tampilkan</button>
     </form>
     <div class="flex flex-wrap gap-2">
-        <a class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=excel">Export Excel</a>
-        <a class="rounded border bg-white px-3 py-2 text-sm hover:bg-slate-100" href="?{{ request.GET.urlencode }}{% if request.GET.urlencode %}&{% endif %}export=pdf">Export PDF</a>
         <a class="rounded bg-slate-900 px-3 py-2 text-sm text-white hover:bg-slate-700" href="new/">Tambah</a>
     </div>
 </div>
@@ -48,7 +46,7 @@
                         <a class="text-sm text-slate-700 hover:underline" href="{{ object.uuid }}/edit/">Edit</a>
                         {% endif %}
                         {% for action in list_actions %}
-                        <a class="text-sm text-slate-700 hover:underline" href="{% url action.url_name object.uuid %}"{% if action.target %} target="{{ action.target }}" rel="noopener"{% endif %}>{{ action.label }}</a>
+                        <a class="text-sm text-slate-700 hover:underline" href="{% url action.url_name object.uuid %}" {% if action.target %}target="{{ action.target }}" rel="noopener"{% endif %}>{{ action.label }}</a>
                         {% endfor %}
                         {% if not is_closed %}
                         <a class="text-sm text-red-700 hover:underline" href="{{ object.uuid }}/delete/">Hapus</a>
@@ -58,7 +56,9 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="{{ list_display|length|add:1 }}">Belum ada data.</td></tr>
+            <tr>
+                <td class="px-4 py-6 text-center text-slate-500" colspan="{{ list_display|length|add:1 }}">Belum ada data.</td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
@@ -76,7 +76,7 @@
     <span class="rounded border bg-white px-3 py-2 font-medium">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
     <div class="flex items-center gap-1">
         {% if page_obj.has_next %}
-        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.next_page_number }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Berikutnya</a>
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.next_page_number }}&start_date={{ start_date }}&end_date={{ end_date }}">Berikutnya</a>
         {% endif %}
         {% if page_obj.number < page_obj.paginator.num_pages %}
         <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.paginator.num_pages }}&q={{ q }}&start_date={{ start_date }}&end_date={{ end_date }}">Terakhir</a>
@@ -85,4 +85,3 @@
 </div>
 {% endif %}
 {% endblock %}
-
