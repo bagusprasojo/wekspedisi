@@ -46,6 +46,19 @@ class TenantQuerysetMixin(TenantRequiredMixin):
             end_default = today.replace(month=12, day=31) if self.date_filter_default == 'year' else today
             start_date = self.request.GET.get('start_date', '').strip() or start_default.isoformat()
             end_date = self.request.GET.get('end_date', '').strip() or end_default.isoformat()
+            try:
+                s_date = timezone.datetime.strptime(start_date, '%Y-%m-%d').date()
+                e_date = timezone.datetime.strptime(end_date, '%Y-%m-%d').date()
+                if s_date.year != e_date.year:
+                    from django.contrib import messages
+                    title_name = getattr(self, 'config', None).title if hasattr(self, 'config') and getattr(self, 'config', None) else 'data'
+                    messages.warning(self.request, f'Periode filter {title_name} harus berada pada tahun yang sama.')
+                    e_date = s_date.replace(month=12, day=31)
+                    end_date = e_date.isoformat()
+            except (ValueError, TypeError):
+                pass
+            self.effective_start_date = start_date
+            self.effective_end_date = end_date
             queryset = queryset.filter(**{f'{self.date_filter_field}__gte': start_date})
             queryset = queryset.filter(**{f'{self.date_filter_field}__lte': end_date})
         return queryset
@@ -251,8 +264,11 @@ class CrudConfig:
         return headers
 
 def build_crud_views(config):
+    crud_config = config
     class GeneratedListView(TenantQuerysetMixin, ListView):
-        model = config.model
+        config = crud_config
+        title = crud_config.title
+        model = crud_config.model
         template_name = 'crud/list.html'
         paginate_by = 20
         search_fields = config.search_fields
@@ -292,8 +308,8 @@ def build_crud_views(config):
                 'hide_list_edit': config.hide_list_edit,
                 'list_actions': config.list_actions,
                 'date_filter_field': config.date_filter_field,
-                'start_date': self.request.GET.get('start_date', '') or (timezone.localdate().replace(month=1, day=1).isoformat() if config.date_filter_field and config.date_filter_default == 'year' else timezone.localdate().replace(day=1).isoformat() if config.date_filter_field else ''),
-                'end_date': self.request.GET.get('end_date', '') or (timezone.localdate().replace(month=12, day=31).isoformat() if config.date_filter_field and config.date_filter_default == 'year' else timezone.localdate().isoformat() if config.date_filter_field else ''),
+                'start_date': getattr(self, 'effective_start_date', '') or self.request.GET.get('start_date', '') or (timezone.localdate().replace(month=1, day=1).isoformat() if config.date_filter_field and config.date_filter_default == 'year' else timezone.localdate().replace(day=1).isoformat() if config.date_filter_field else ''),
+                'end_date': getattr(self, 'effective_end_date', '') or self.request.GET.get('end_date', '') or (timezone.localdate().replace(month=12, day=31).isoformat() if config.date_filter_field and config.date_filter_default == 'year' else timezone.localdate().isoformat() if config.date_filter_field else ''),
                 'q': self.request.GET.get('q', ''),
             })
             return context

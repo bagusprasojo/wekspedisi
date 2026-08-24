@@ -380,3 +380,48 @@ class ReportLayoutTests(TestCase):
         res_diff_year = self.client.get('/reports/rekap-transaksi-kas/', {'start_date': '2025-06-01', 'end_date': '2026-06-30'})
         self.assertEqual(res_diff_year.status_code, 200)
         self.assertContains(res_diff_year, 'Periode Rekap Transaksi Kas harus berada pada tahun yang sama.')
+
+    def test_rekap_transaksi_bank_pagination_full_export_and_same_year_validation(self):
+        tenant = Tenant.objects.create(name='CV Bank Test')
+        user = get_user_model().objects.create_user(username='admin-bank-test')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        kas = ChartOfAccount.objects.create(tenant=tenant, kode='101', nama='Bank Utama', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        bank = BankAccount.objects.create(tenant=tenant, no_rekening='001', nama_bank='Bank Utama', atas_nama='CV Bank Test', akun=kas)
+        from master.models import TransactionType
+        jenis = TransactionType.objects.create(tenant=tenant, kode='01', nama='Setoran Tunai', akun=kas)
+
+        from finance.models import BankTransaction
+        for i in range(25):
+            BankTransaction.objects.create(
+                tenant=tenant,
+                no_bukti=f'BNK-{i+1}',
+                tanggal=date(2026, 7, 1),
+                bank_utama=bank,
+                jenis_transaksi=jenis,
+                debet=Decimal('1000'),
+                kredit=Decimal('0'),
+                created_by=user,
+            )
+
+        self.client.force_login(user)
+
+        # 1. HTML View paginates (page 1 has 20 rows, page 2 has 5 rows)
+        res_p1 = self.client.get('/reports/rekap-transaksi-bank/', {'start_date': '2026-07-01', 'end_date': '2026-07-31'})
+        self.assertEqual(res_p1.status_code, 200)
+        self.assertTrue(res_p1.context['is_paginated'])
+        self.assertEqual(len(res_p1.context['rows']), 20)
+        self.assertContains(res_p1, 'Berikutnya')
+
+        res_p2 = self.client.get('/reports/rekap-transaksi-bank/', {'start_date': '2026-07-01', 'end_date': '2026-07-31', 'page': '2'})
+        self.assertEqual(res_p2.status_code, 200)
+        self.assertEqual(len(res_p2.context['rows']), 5)
+        self.assertContains(res_p2, 'Pertama')
+
+        # 2. Export Excel exports ALL 25 rows
+        res_excel = self.client.get('/reports/rekap-transaksi-bank/', {'start_date': '2026-07-01', 'end_date': '2026-07-31', 'export': 'excel'})
+        self.assertEqual(res_excel.status_code, 200)
+
+        # 3. Same-year validation warning when period spans across years
+        res_diff_year = self.client.get('/reports/rekap-transaksi-bank/', {'start_date': '2025-06-01', 'end_date': '2026-06-30'})
+        self.assertEqual(res_diff_year.status_code, 200)
+        self.assertContains(res_diff_year, 'Periode Rekap Transaksi Bank harus berada pada tahun yang sama.')

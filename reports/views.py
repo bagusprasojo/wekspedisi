@@ -442,6 +442,10 @@ def riwayat_pembelian_bbm(request):
 def rekap_transaksi_bank(request):
     require_tenant(request)
     filters = month_report_filters(request)
+    if filters['start_date'].year != filters['end_date'].year:
+        from django.contrib import messages
+        messages.warning(request, 'Periode Rekap Transaksi Bank harus berada pada tahun yang sama.')
+        filters['end_date'] = date(filters['start_date'].year, 12, 31)
     rows = services.rekap_transaksi_bank(request.tenant, filters['start_date'], filters['end_date'])
     if request.GET.get('export') in {'excel', 'pdf'}:
         period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
@@ -484,7 +488,24 @@ def rekap_transaksi_bank(request):
             export_rows,
             [(0, 320, 'Grand Total  ', 'text', 3), (320, 80, sum((row.debet for row in rows), ZERO), 'number', 1), (400, 82, sum((row.kredit for row in rows), ZERO), 'number', 1), (482, 72, '', 'text', 2)],
         )
-    return render(request, 'reports/rekap_transaksi_bank.html', {'title': 'Rekap Transaksi Bank', 'rows': rows, 'export_excel_pdf': True, **filters})
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    total_debet = sum((row.debet for row in rows), ZERO)
+    total_kredit = sum((row.kredit for row in rows), ZERO)
+    return render(
+        request,
+        'reports/rekap_transaksi_bank.html',
+        {
+            'title': 'Rekap Transaksi Bank',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_debet': total_debet,
+            'total_kredit': total_kredit,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )
 
 @login_required
 def rekening_koran(request):

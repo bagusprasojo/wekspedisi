@@ -326,3 +326,12 @@ class TransactionClosingActionVisibilityTests(TestCase):
         self.assertNotContains(response, f'{transaction.uuid}/delete/')
         self.assertNotContains(response, '>Edit<')
         self.assertNotContains(response, '>Hapus<')
+
+    def test_cash_transaction_list_warns_on_different_year_period(self):
+        tenant = Tenant.objects.create(name='CV Test Warn')
+        user = get_user_model().objects.create_user(username='admin-warn', password='secret')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        self.client.login(username='admin-warn', password='secret')
+        response = self.client.get('/finance/transaksi-kas/', {'start_date': '2025-06-01', 'end_date': '2026-06-30'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Periode filter Transaksi Kas harus berada pada tahun yang sama.')
