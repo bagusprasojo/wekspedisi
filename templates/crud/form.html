@@ -23,6 +23,38 @@
                     <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
                 </div>
             </span>
+            {% elif form_model_name == 'loandebt' and field.name == 'perkiraan_hutang' %}
+            <span class="relative block" x-data="autocompleteLookup('{% url 'finance_transaksi_kas_account_lookup' %}', '{{ field.id_for_label }}', '{{ initial_account_label|default_if_none:''|escapejs }}')" x-init="init()">
+                <select class="absolute h-px w-px opacity-0" id="{{ field.id_for_label }}" name="{{ field.html_name }}" tabindex="-1" aria-hidden="true">
+                    <option value="">---------</option>
+                    {% for value, label in field.field.choices %}
+                    <option value="{{ value }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih akun hutang..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
+            {% elif form_model_name == 'loandebt' and field.name == 'pemberi_pinjaman' %}
+            <span class="relative block" x-data="autocompleteLookup('{% url 'master_lookup_stakeholder' %}', '{{ field.id_for_label }}', '{{ initial_pemberi_pinjaman_label|default_if_none:''|escapejs }}')" x-init="init()">
+                <select class="absolute h-px w-px opacity-0" id="{{ field.id_for_label }}" name="{{ field.html_name }}" tabindex="-1" aria-hidden="true">
+                    <option value="">---------</option>
+                    {% for value, label in field.field.choices %}
+                    <option value="{{ value }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih pemberi pinjaman..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
             {% elif form_model_name == 'cashtransaction' and field.name == 'akun_transaksi' %}
             <span class="relative block" x-data="autocompleteLookup('{% url 'finance_transaksi_kas_account_lookup' %}', '{{ field.id_for_label }}', '')" x-init="init()">
                 <select class="absolute h-px w-px opacity-0" id="{{ field.id_for_label }}" name="{{ field.html_name }}" tabindex="-1" aria-hidden="true">
@@ -50,6 +82,17 @@
                     <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
                 </div>
             </span>
+            {% elif form_model_name == 'loandebtpayment' and field.name == 'hutang_pinjaman' %}
+            <span class="relative block" x-data="autocompleteLookup('{% url 'finance_hutang_pinjaman_lookup' %}', '{{ field.id_for_label }}', '{{ initial_loan_debt_label|default_if_none:''|escapejs }}')" x-init="init()">
+                <input type="hidden" id="{{ field.id_for_label }}" name="{{ field.html_name }}" value="{{ field.value|default:'' }}" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari no. register, pemberi pinjaman, atau hutang..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
             {% elif form_model_name == 'customerinvoicepayment' and field.name == 'tagihan_customer' %}
             <select class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" x-on:change="setInvoicePaymentInfo($event.target)" {% if field.field.required %}required{% endif %}>
                 <option value="">---------</option>
@@ -68,6 +111,10 @@
                     <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
                 </div>
             </span>
+            {% elif form_model_name == 'loandebt' and field.name == 'bank' %}
+            {{ field }}
+            {% elif form_model_name == 'loandebtpayment' and field.name == 'bank' %}
+            {{ field }}
             {% elif field.field.widget.attrs.lookup %}
             <span class="space-y-2" x-data="lookupSelect()" x-init="filter($refs.select)">
                 <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari {{ field.label|lower }}..." type="search" x-model="q" x-on:input="filter($refs.select)">
@@ -93,6 +140,21 @@
             </div>
             <div>
                 <p class="text-slate-500">Nama</p>
+                <p class="font-semibold" x-text="cashAdvanceName || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Alamat</p>
+                <p class="font-semibold" x-text="cashAdvanceAddress || '-'"></p>
+            </div>
+        </div>
+        {% elif form_model_name == 'loandebtpayment' and field.name == 'tanggal' %}
+        <div class="grid gap-3 rounded border bg-slate-50 p-3 text-sm md:col-span-2 md:grid-cols-3">
+            <div>
+                <p class="text-slate-500">Saldo Hutang</p>
+                <p class="font-semibold" x-text="cashAdvanceBalance || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Pemberi Pinjaman</p>
                 <p class="font-semibold" x-text="cashAdvanceName || '-'"></p>
             </div>
             <div>
@@ -250,9 +312,9 @@ function transactionCalculator(modelName) {
         showPph: true,
         isBankTransfer: false,
         bankTransactionCode: '',
-        cashAdvanceName: '',
-        cashAdvanceAddress: '',
-        cashAdvanceBalance: '',
+        cashAdvanceName: '{{ initial_cash_advance_name|default_if_none:''|escapejs }}',
+        cashAdvanceAddress: '{{ initial_cash_advance_address|default_if_none:''|escapejs }}',
+        cashAdvanceBalance: '{{ initial_cash_advance_balance|default_if_none:''|escapejs }}',
         invoicePaymentName: '',
         invoicePaymentAddress: '',
         invoicePaymentBalance: '',
@@ -277,7 +339,7 @@ function transactionCalculator(modelName) {
                 if (e.detail && e.detail.hiddenId === 'id_armada' && e.detail.item) {
                     this.onArmadaSelected(e.detail.item);
                 }
-                if (e.detail && e.detail.hiddenId === 'id_kas_bon_karyawan' && e.detail.item) {
+                if (e.detail && (e.detail.hiddenId === 'id_kas_bon_karyawan' || e.detail.hiddenId === 'id_hutang_pinjaman') && e.detail.item) {
                     this.setCashAdvanceInfo(e.detail.item);
                 }
             });

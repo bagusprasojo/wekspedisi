@@ -87,6 +87,19 @@
                                 <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_saldo_kas_bon' %}">Rekap Saldo Kasbon</a>
                             </div>
                         </div>
+                        <div class="rounded px-3 py-2" x-data="{ open: localStorage.getItem('menu-hutang-pinjaman') !== 'closed' }">
+                            <button class="flex w-full items-center justify-between rounded py-1 text-left font-medium text-slate-700 hover:text-slate-900" type="button" x-on:click="open = !open; localStorage.setItem('menu-hutang-pinjaman', open ? 'open' : 'closed')">
+                                <span>Hutang Pinjaman</span>
+                                <span class="text-xs" x-text="open ? 'v' : '>'"></span>
+                            </button>
+                            <div class="mt-1 space-y-1 border-l pl-3" x-cloak x-show="open">
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'finance_hutang_pinjaman_list' %}">Input Hutang</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'finance_pembayaran_hutang_list' %}">Pembayaran Hutang</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekap_transaksi_hutang' %}">Rekap Transaksi Hutang</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekap_pembayaran_hutang' %}">Rekap Pembayaran Hutang</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_saldo_hutang' %}">Rekap Saldo Hutang</a>
+                            </div>
+                        </div>
                         <div class="rounded px-3 py-2" x-data="{ open: localStorage.getItem('menu-invoice-customer') !== 'closed' }">
                             <button class="flex w-full items-center justify-between rounded py-1 text-left font-medium text-slate-700 hover:text-slate-900" type="button" x-on:click="open = !open; localStorage.setItem('menu-invoice-customer', open ? 'open' : 'closed')">
                                 <span>Invoice Customer</span>

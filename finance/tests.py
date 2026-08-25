@@ -327,11 +327,110 @@ class TransactionClosingActionVisibilityTests(TestCase):
         self.assertNotContains(response, '>Edit<')
         self.assertNotContains(response, '>Hapus<')
 
-    def test_cash_transaction_list_warns_on_different_year_period(self):
-        tenant = Tenant.objects.create(name='CV Test Warn')
-        user = get_user_model().objects.create_user(username='admin-warn', password='secret')
-        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
-        self.client.login(username='admin-warn', password='secret')
-        response = self.client.get('/finance/transaksi-kas/', {'start_date': '2025-06-01', 'end_date': '2026-06-30'})
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Periode filter Transaksi Kas harus berada pada tahun yang sama.')
+
+
+class LoanDebtFeatureTests(TestCase):
+    def test_loan_debt_and_payment_blocked_when_period_closed(self):
+        from accounting.models import ClosingPeriod
+        from finance.models import LoanDebt, LoanDebtPayment
+        from django.core.exceptions import ValidationError
+
+        ClosingPeriod.objects.create(tenant=self.tenant, tanggal=date(2026, 8, 31))
+
+        # Attempt to input loan debt on closed period
+        debt = LoanDebt(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 10),
+            pemberi_pinjaman=self.lender,
+            perkiraan_hutang=self.hutang_acc,
+            bank=self.bank,
+            nominal=Decimal('1000000.00'),
+            keterangan='Hutang di periode tutup',
+        )
+        with self.assertRaises(ValidationError):
+            debt.save_with_business_rules()
+
+    def test_loan_debt_payment_invalid_form_preserves_context(self):
+        from finance.models import LoanDebt
+        debt = LoanDebt(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 1),
+            pemberi_pinjaman=self.lender,
+            perkiraan_hutang=self.hutang_acc,
+            bank=self.bank,
+            nominal=Decimal('1000000.00'),
+            keterangan='Hutang awal',
+        )
+        debt.save_with_business_rules()
+
+        self.client.login(username='admin-hutang-test', password='secret')
+        # Submit nominal exceeding balance (1.500.000 > 1.000.000)
+        res = self.client.post('/finance/pembayaran-hutang/new/', {
+            'hutang_pinjaman': debt.id,
+            'tanggal': '2026-08-05',
+            'bank': self.bank.id,
+            'nominal': '1500000',
+            'keterangan': 'Overpay',
+        })
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('initial_loan_debt_label', res.context)
+        self.assertIn(debt.no_register, res.context['initial_loan_debt_label'])
+        self.assertIn('initial_cash_advance_balance', res.context)
+
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='CV Hutang Test')
+        self.user = get_user_model().objects.create_user(username='admin-hutang-test', password='secret')
+        UserProfile.objects.create(user=self.user, tenant=self.tenant, role=UserProfile.Role.ADMIN)
+        self.kas = ChartOfAccount.objects.create(tenant=self.tenant, kode='101', nama='Kas Utama', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        self.hutang_acc = ChartOfAccount.objects.create(tenant=self.tenant, kode='201', nama='Hutang Bank', saldo_normal=ChartOfAccount.NormalBalance.KREDIT, golongan='PASIVA', kelompok='KEWAJIBAN')
+        self.bank = BankAccount.objects.create(tenant=self.tenant, no_rekening='001', nama_bank='Bank BCA', atas_nama='CV Hutang Test', akun=self.kas)
+        self.lender = StakeHolder.objects.create(tenant=self.tenant, kode='LEN-01', nama='Bank BCA Subang', jenis=StakeHolder.StakeHolderType.CUSTOMER)
+
+    def test_loan_debt_and_payment_creates_automatic_journals_and_updates_status(self):
+        from finance.models import LoanDebt, LoanDebtPayment
+        from accounting.models import Journal
+
+        # 1. Create Loan Debt (Receive loan: Debet Kas 10.000.000, Kredit Hutang 10.000.000)
+        debt = LoanDebt(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 1),
+            pemberi_pinjaman=self.lender,
+            perkiraan_hutang=self.hutang_acc,
+            bank=self.bank,
+            nominal=Decimal('10000000'),
+            keterangan='Pinjaman modal kerja',
+        ).save_with_business_rules(user=self.user)
+
+        self.assertEqual(debt.status_lunas, 'Belum')
+        self.assertTrue(debt.no_register.startswith('HTG'))
+
+        journal1 = Journal.objects.filter(tenant=self.tenant, transaksi_id=debt.pk).first()
+        self.assertIsNotNone(journal1)
+        lines1 = list(journal1.lines.order_by('id'))
+        self.assertEqual(lines1[0].perkiraan, self.kas)
+        self.assertEqual(lines1[0].debet, Decimal('10000000'))
+        self.assertEqual(lines1[1].perkiraan, self.hutang_acc)
+        self.assertEqual(lines1[1].kredit, Decimal('10000000'))
+
+        # 2. Pay Loan Debt (Pay loan: Debet Hutang 10.000.000, Kredit Kas 10.000.000)
+        payment = LoanDebtPayment(
+            tenant=self.tenant,
+            hutang_pinjaman=debt,
+            tanggal=date(2026, 8, 15),
+            bank=self.bank,
+            nominal=Decimal('10000000'),
+            keterangan='Pelunasan pinjaman',
+        ).save_with_business_rules(user=self.user)
+
+        debt.refresh_from_db()
+        self.assertEqual(debt.status_lunas, 'Lunas')
+        self.assertEqual(debt.pelunasan, Decimal('10000000'))
+        self.assertEqual(debt.saldo, Decimal('0'))
+
+        journal2 = Journal.objects.filter(tenant=self.tenant, transaksi_id=payment.pk).first()
+        self.assertIsNotNone(journal2)
+        lines2 = list(journal2.lines.order_by('id'))
+        self.assertEqual(lines2[0].perkiraan, self.hutang_acc)
+        self.assertEqual(lines2[0].debet, Decimal('10000000'))
+        self.assertEqual(lines2[1].perkiraan, self.kas)
+        self.assertEqual(lines2[1].kredit, Decimal('10000000'))

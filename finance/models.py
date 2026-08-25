@@ -296,6 +296,133 @@ def refresh_cash_advance_status(advance):
     advance.save(update_fields=['pelunasan', 'status_lunas', 'updated_at'])
 
 
+class LoanDebt(TenantScopedModel):
+    class StatusLunas(models.TextChoices):
+        BELUM = 'Belum', 'Belum'
+        LUNAS = 'Lunas', 'Lunas'
+
+    no_register = models.CharField(max_length=50, blank=True)
+    tanggal = models.DateField()
+    pemberi_pinjaman = models.ForeignKey('master.StakeHolder', related_name='loan_debts', on_delete=models.PROTECT)
+    perkiraan_hutang = models.ForeignKey('master.ChartOfAccount', related_name='loan_debts_account', on_delete=models.PROTECT)
+    perkiraan_kas = models.ForeignKey('master.ChartOfAccount', related_name='loan_debts_cash', on_delete=models.PROTECT)
+    nominal = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    keterangan = models.TextField(blank=True)
+    bank = models.ForeignKey('master.BankAccount', null=True, blank=True, related_name='loan_debts', on_delete=models.PROTECT)
+    sumber_dana = models.CharField(max_length=100, blank=True)
+    pelunasan = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    status_lunas = models.CharField(max_length=10, choices=StatusLunas.choices, default=StatusLunas.BELUM)
+
+    class Meta:
+        ordering = ['-tanggal', '-id']
+        constraints = [models.UniqueConstraint(fields=['tenant', 'no_register'], name='uniq_loandebt_tenant_no_register')]
+
+    def __str__(self):
+        return self.no_register or 'Hutang Pinjaman'
+
+    @property
+    def saldo(self):
+        return self.nominal - self.pelunasan
+
+    @transaction.atomic
+    def save_with_business_rules(self, user=None):
+        old = type(self).objects.filter(pk=self.pk).first() if self.pk else None
+        ensure_open_period(self.tenant, self.tanggal, old.tanggal if old else None)
+        if old and old.pelunasan > ZERO:
+            raise ValidationError('Hutang pinjaman tidak bisa diubah karena sudah ada pembayaran.')
+        if not self.pemberi_pinjaman:
+            raise ValidationError('Pemberi pinjaman belum dipilih.')
+        if not self.perkiraan_hutang:
+            raise ValidationError('Akun hutang belum dipilih.')
+        if not self.bank:
+            raise ValidationError('Bank/Kas belum dipilih.')
+        if not self.bank.akun:
+            raise ValidationError('Akun pada Kas/Bank wajib diisi di master Bank/Kas.')
+        if self.nominal <= ZERO:
+            raise ValidationError('Nominal belum diisi.')
+        self.perkiraan_kas = self.bank.akun
+        self.sumber_dana = str(self.bank)
+        assign_number(self, 'no_register', 'HTG')
+        self.status_lunas = self.StatusLunas.LUNAS if self.nominal <= self.pelunasan else self.StatusLunas.BELUM
+        self.save()
+        lines = [{'account': self.perkiraan_kas, 'debet': self.nominal}, {'account': self.perkiraan_hutang, 'kredit': self.nominal}]
+        refresh_journal(obj=self, no_jurnal=self.no_register, tanggal=self.tanggal, keterangan=self.keterangan, lines=lines, user=user)
+        return self
+
+    def delete_with_business_rules(self, user=None):
+        ensure_open_period(self.tenant, self.tanggal)
+        if self.pelunasan > ZERO:
+            raise ValidationError('Hutang pinjaman tidak bisa dihapus karena sudah ada pembayaran.')
+        delete_generated_journal(self)
+        self.delete()
+
+
+class LoanDebtPayment(TenantScopedModel):
+    no_register = models.CharField(max_length=50, blank=True)
+    tanggal = models.DateField()
+    hutang_pinjaman = models.ForeignKey(LoanDebt, related_name='payments', on_delete=models.PROTECT)
+    perkiraan_kas = models.ForeignKey('master.ChartOfAccount', related_name='loan_debt_payments', on_delete=models.PROTECT)
+    nominal = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    keterangan = models.TextField(blank=True)
+    bank = models.ForeignKey('master.BankAccount', null=True, blank=True, related_name='loan_debt_payments', on_delete=models.PROTECT)
+    sumber_dana = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        ordering = ['-tanggal', '-id']
+        constraints = [models.UniqueConstraint(fields=['tenant', 'no_register'], name='uniq_loandebtpayment_tenant_no_register')]
+
+    def __str__(self):
+        return self.no_register or 'Pembayaran Hutang'
+
+    @property
+    def hutang(self):
+        return self.hutang_pinjaman.nominal
+
+    @property
+    def saldo_hutang(self):
+        return self.hutang_pinjaman.nominal - self.nominal
+
+    @transaction.atomic
+    def save_with_business_rules(self, user=None):
+        old = type(self).objects.filter(pk=self.pk).first() if self.pk else None
+        ensure_open_period(self.tenant, self.tanggal, old.tanggal if old else None)
+        if not self.bank:
+            raise ValidationError('Via bank/kas belum dipilih.')
+        if not self.bank.akun:
+            raise ValidationError('Akun pada Kas/Bank wajib diisi di master Bank/Kas.')
+        if self.nominal <= ZERO:
+            raise ValidationError('Nominal belum diisi.')
+        paid_before_this = self.hutang_pinjaman.payments.filter(is_deleted=False).exclude(pk=self.pk).aggregate(total=Sum('nominal'))['total'] or ZERO
+        available_balance = self.hutang_pinjaman.nominal - paid_before_this
+        if self.nominal > available_balance:
+            raise ValidationError('Pembayaran melebihi saldo hutang.')
+        self.perkiraan_kas = self.bank.akun
+        self.sumber_dana = str(self.bank)
+        assign_number(self, 'no_register', 'BHTG')
+        self.save()
+        lines = [{'account': self.hutang_pinjaman.perkiraan_hutang, 'debet': self.nominal}, {'account': self.perkiraan_kas, 'kredit': self.nominal}]
+        refresh_journal(obj=self, no_jurnal=self.no_register, tanggal=self.tanggal, keterangan=self.keterangan, lines=lines, user=user)
+        refresh_loan_debt_status(self.hutang_pinjaman)
+        if old and old.hutang_pinjaman_id != self.hutang_pinjaman_id:
+            refresh_loan_debt_status(old.hutang_pinjaman)
+        return self
+
+    def delete_with_business_rules(self, user=None):
+        ensure_open_period(self.tenant, self.tanggal)
+        debt = self.hutang_pinjaman
+        delete_generated_journal(self)
+        self.delete()
+        refresh_loan_debt_status(debt)
+
+
+def refresh_loan_debt_status(debt):
+    total = debt.payments.filter(is_deleted=False).aggregate(total=Sum('nominal'))['total'] or ZERO
+    debt.pelunasan = total
+    debt.status_lunas = LoanDebt.StatusLunas.LUNAS if debt.nominal <= total else LoanDebt.StatusLunas.BELUM
+    debt.save(update_fields=['pelunasan', 'status_lunas', 'updated_at'])
+
+
+
 
 
 

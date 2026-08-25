@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase
+from .models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase, LoanDebt, LoanDebtPayment
 
 COMMON_EXCLUDE = ['tenant', 'created_by', 'updated_by', 'is_deleted', 'deleted_at', 'deleted_by']
 
@@ -82,3 +82,25 @@ class EmployeeCashAdvancePaymentForm(forms.ModelForm):
         }
 
 
+
+
+class LoanDebtForm(forms.ModelForm):
+    class Meta:
+        model = LoanDebt
+        fields = ['perkiraan_hutang', 'pemberi_pinjaman', 'tanggal', 'bank', 'nominal', 'keterangan']
+        labels = {
+            'perkiraan_hutang': 'Akun Hutang',
+            'pemberi_pinjaman': 'Pemberi Pinjaman',
+            'bank': 'Kas/Bank Penerima Uang',
+        }
+
+
+class LoanDebtPaymentForm(forms.ModelForm):
+    class Meta:
+        model = LoanDebtPayment
+        fields = ['hutang_pinjaman', 'tanggal', 'bank', 'nominal', 'keterangan']
+        labels = {
+            'hutang_pinjaman': 'Hutang Pinjaman',
+            'bank': 'Kas/Bank Sumber Uang',
+            'nominal': 'Nominal Pembayaran',
+        }

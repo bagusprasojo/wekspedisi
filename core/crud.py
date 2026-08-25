@@ -1,3 +1,84 @@
+def populate_form_context(context, config, request, form=None, obj=None):
+    from decimal import Decimal
+    from core.templatetags.crud_extras import format_money
+    model_name = config.model._meta.model_name
+    tenant = getattr(request, 'tenant', None)
+
+    if model_name in {'fuelpurchase', 'cashtransaction', 'armada'}:
+        armada_obj = None
+        if obj and getattr(obj, 'armada', None):
+            armada_obj = obj.armada
+        elif form and form.is_bound and form.data.get('armada'):
+            from master.models import Armada
+            armada_obj = Armada.objects.filter(pk=form.data.get('armada'), tenant=tenant, is_deleted=False).first()
+        if armada_obj:
+            parts = [armada_obj.nopol]
+            if armada_obj.kendaraan:
+                parts.append(armada_obj.kendaraan)
+            if armada_obj.driver:
+                parts.append(f'Supir: {armada_obj.driver.nama}')
+            elif armada_obj.pemilik:
+                parts.append(f'Milik: {armada_obj.pemilik}')
+            context['initial_armada_label'] = ' - '.join(parts)
+
+    if model_name == 'employeecashadvancepayment':
+        adv_obj = None
+        current_nominal = Decimal('0')
+        if obj and getattr(obj, 'kas_bon_karyawan', None):
+            adv_obj = obj.kas_bon_karyawan
+            current_nominal = obj.nominal or Decimal('0')
+        elif form and form.is_bound and form.data.get('kas_bon_karyawan'):
+            from finance.models import EmployeeCashAdvance
+            adv_obj = EmployeeCashAdvance.objects.filter(pk=form.data.get('kas_bon_karyawan'), tenant=tenant, is_deleted=False).first()
+            if form.data.get('nominal'):
+                try:
+                    current_nominal = Decimal(str(form.data.get('nominal')))
+                except Exception:
+                    pass
+        if adv_obj:
+            saldo_val = adv_obj.saldo + current_nominal
+            context['initial_cash_advance_label'] = f"{adv_obj.no_register} - {adv_obj.karyawan.nama if adv_obj.karyawan else ''} (Sisa: {format_money(saldo_val)})"
+            context['initial_cash_advance_name'] = adv_obj.karyawan.nama if adv_obj.karyawan else ''
+            context['initial_cash_advance_address'] = getattr(adv_obj.karyawan, 'alamat', '') if adv_obj.karyawan else ''
+            context['initial_cash_advance_balance'] = format_money(saldo_val)
+
+    if model_name == 'loandebt':
+        acc_obj = getattr(obj, 'perkiraan_hutang', None) if obj else None
+        stk_obj = getattr(obj, 'pemberi_pinjaman', None) if obj else None
+        if form and form.is_bound:
+            if not acc_obj and form.data.get('perkiraan_hutang'):
+                from master.models import ChartOfAccount
+                acc_obj = ChartOfAccount.objects.filter(pk=form.data.get('perkiraan_hutang'), tenant=tenant, is_deleted=False).first()
+            if not stk_obj and form.data.get('pemberi_pinjaman'):
+                from master.models import StakeHolder
+                stk_obj = StakeHolder.objects.filter(pk=form.data.get('pemberi_pinjaman'), tenant=tenant, is_deleted=False).first()
+        if acc_obj:
+            context['initial_account_label'] = str(acc_obj)
+        if stk_obj:
+            context['initial_pemberi_pinjaman_label'] = str(stk_obj)
+
+    if model_name == 'loandebtpayment':
+        debt_obj = None
+        current_nominal = Decimal('0')
+        if obj and getattr(obj, 'hutang_pinjaman', None):
+            debt_obj = obj.hutang_pinjaman
+            current_nominal = obj.nominal or Decimal('0')
+        elif form and form.is_bound and form.data.get('hutang_pinjaman'):
+            from finance.models import LoanDebt
+            debt_obj = LoanDebt.objects.filter(pk=form.data.get('hutang_pinjaman'), tenant=tenant, is_deleted=False).first()
+            if form.data.get('nominal'):
+                try:
+                    current_nominal = Decimal(str(form.data.get('nominal')))
+                except Exception:
+                    pass
+        if debt_obj:
+            saldo_val = debt_obj.saldo + current_nominal
+            context['initial_loan_debt_label'] = f"{debt_obj.no_register} - {debt_obj.pemberi_pinjaman.nama if debt_obj.pemberi_pinjaman else ''} (Sisa: {format_money(saldo_val)})"
+            context['initial_cash_advance_name'] = debt_obj.pemberi_pinjaman.nama if debt_obj.pemberi_pinjaman else ''
+            context['initial_cash_advance_address'] = getattr(debt_obj.pemberi_pinjaman, 'alamat', '') if debt_obj.pemberi_pinjaman else ''
+            context['initial_cash_advance_balance'] = format_money(saldo_val)
+
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -112,6 +193,22 @@ class TenantFormMixin(TenantRequiredMixin):
                     field.queryset = field.queryset.filter(jenis=StakeHolder.StakeHolderType.CUSTOMER)
                 if form.__class__.__name__ == 'EmployeeCashAdvanceForm' and field_name == 'perkiraan_pinjaman':
                     field.queryset = field.queryset.filter(kode__in=['1030100', '1030200'])
+                if form.__class__.__name__ == 'LoanDebtForm' and field_name == 'perkiraan_hutang':
+                    from django.db.models import Exists, OuterRef, Q
+                    from master.models import ChartOfAccount
+                    child_accounts = ChartOfAccount.objects.filter(
+                        tenant=self.request.tenant,
+                        is_deleted=False,
+                        parent=OuterRef('pk'),
+                    )
+                    field.queryset = field.queryset.filter(
+                        Q(golongan='PASIVA') | Q(kelompok='KEWAJIBAN')
+                    ).annotate(has_children=Exists(child_accounts)).filter(has_children=False)
+                if form.__class__.__name__ == 'LoanDebtPaymentForm' and field_name == 'hutang_pinjaman':
+                    current_debt_id = getattr(getattr(self, 'object', None), 'hutang_pinjaman_id', None)
+                    field.queryset = (
+                        field.queryset.filter(status_lunas='Belum') | field.queryset.filter(pk=current_debt_id)
+                    )
                 if form.__class__.__name__ == 'EmployeeCashAdvancePaymentForm' and field_name == 'kas_bon_karyawan':
                     current_cash_advance_id = getattr(getattr(self, 'object', None), 'kas_bon_karyawan_id', None)
                     from django.db.models import Case, DecimalField, ExpressionWrapper, F, Value, When
@@ -326,6 +423,7 @@ def build_crud_views(config):
         def get_context_data(self, **kwargs):
             context = super().get_context_data(**kwargs)
             context.update({'title': f'Tambah {config.title}', 'cancel_url': reverse_lazy(config.success_url_name), 'form_model_name': config.model._meta.model_name})
+            populate_form_context(context, config, self.request, form=kwargs.get('form') or context.get('form'))
             return context
 
     class GeneratedUpdateView(TenantFormMixin, UpdateView):
@@ -345,22 +443,7 @@ def build_crud_views(config):
         def get_context_data(self, **kwargs):
             context = super().get_context_data(**kwargs)
             context.update({'title': f'Edit {config.title}', 'cancel_url': reverse_lazy(config.success_url_name), 'form_model_name': config.model._meta.model_name})
-            if config.model._meta.model_name in {'fuelpurchase', 'cashtransaction'} and getattr(self, 'object', None) and getattr(self.object, 'armada', None):
-                a = self.object.armada
-                parts = [a.nopol]
-                if a.kendaraan:
-                    parts.append(a.kendaraan)
-                if a.driver:
-                    parts.append(f'Supir: {a.driver.nama}')
-                elif a.pemilik:
-                    parts.append(f'Milik: {a.pemilik}')
-                context['initial_armada_label'] = ' - '.join(parts)
-            if config.model._meta.model_name == 'employeecashadvancepayment' and getattr(self, 'object', None) and getattr(self.object, 'kas_bon_karyawan', None):
-                from decimal import Decimal
-                from core.templatetags.crud_extras import format_money
-                adv = self.object.kas_bon_karyawan
-                saldo_val = format_money(adv.saldo + (self.object.nominal or Decimal('0')))
-                context['initial_cash_advance_label'] = f"{adv.no_register} - {adv.karyawan.nama if adv.karyawan else ''} (Sisa: {saldo_val})"
+            populate_form_context(context, config, self.request, form=kwargs.get('form') or context.get('form'), obj=getattr(self, 'object', None))
             return context
 
     class GeneratedDeleteView(TenantDeleteMixin, DeleteView):

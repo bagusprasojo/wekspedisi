@@ -31,6 +31,7 @@
     <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-100 text-left text-slate-600">
             <tr>
+                <th class="px-4 py-3 font-medium">No</th>
                 {% if list_headers %}{% for field, label in list_headers %}<th class="px-4 py-3 font-medium {% if field|is_money_field %}text-right{% endif %}">{{ label }}</th>{% endfor %}{% else %}{% for field in list_display %}<th class="px-4 py-3 font-medium {% if field|is_money_field %}text-right{% endif %}">{{ field|humanize_field }}</th>{% endfor %}{% endif %}
                 <th class="sticky right-0 bg-slate-100 px-4 py-3 font-medium"></th>
             </tr>
@@ -38,6 +39,7 @@
         <tbody class="divide-y divide-slate-100">
             {% for object in object_list %}
             <tr>
+                <td class="whitespace-nowrap px-4 py-3 text-slate-500">{% if page_obj %}{{ forloop.counter|add:page_obj.start_index|add:"-1" }}{% else %}{{ forloop.counter }}{% endif %}</td>
                 {% for field in list_display %}<td class="whitespace-nowrap px-4 py-3 {% if field|is_money_field %}text-right{% endif %}">{% with value=object|get_attr:field %}{% if forloop.first and detail_url_name %}<a class="font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900" href="{% url detail_url_name object.uuid %}">{% if field|is_money_field %}{{ value|format_money }}{% else %}{{ value }}{% endif %}</a>{% else %}{% if field|is_money_field %}{{ value|format_money }}{% else %}{{ value }}{% endif %}{% endif %}{% endwith %}</td>{% endfor %}
                 <td class="sticky right-0 bg-white px-4 py-3 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
                     {% with is_closed=object|is_closed_transaction %}
@@ -57,7 +59,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td class="px-4 py-6 text-center text-slate-500" colspan="{{ list_display|length|add:1 }}">Belum ada data.</td>
+                <td class="px-4 py-6 text-center text-slate-500" colspan="{{ list_display|length|add:2 }}">Belum ada data.</td>
             </tr>
             {% endfor %}
         </tbody>

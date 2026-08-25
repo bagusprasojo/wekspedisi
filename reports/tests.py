@@ -37,6 +37,35 @@ class RekeningKoranLegacyMutationTests(TestCase):
     def account(self, kode, nama):
         return ChartOfAccount.objects.create(tenant=self.tenant, kode=kode, nama=nama, saldo_normal=ChartOfAccount.NormalBalance.DEBET)
 
+    def test_rekening_koran_includes_loan_debt_and_payment(self):
+        from finance.models import LoanDebt, LoanDebtPayment
+        from master.models import StakeHolder
+        lender = StakeHolder.objects.create(tenant=self.tenant, kode='LEN-RK', nama='Pemberi Pinjaman RK')
+        debt = LoanDebt(
+            tenant=self.tenant,
+            tanggal=date(2026, 7, 5),
+            pemberi_pinjaman=lender,
+            perkiraan_hutang=self.offset_account,
+            bank=self.bank,
+            nominal=Decimal('500.00'),
+            keterangan='Pinjaman dana modal',
+        )
+        debt.save_with_business_rules()
+
+        pmt = LoanDebtPayment(
+            tenant=self.tenant,
+            tanggal=date(2026, 7, 10),
+            hutang_pinjaman=debt,
+            bank=self.bank,
+            nominal=Decimal('200.00'),
+            keterangan='Cicilan 1',
+        )
+        pmt.save_with_business_rules()
+
+        rows = services.rekening_koran(self.tenant, date(2026, 7, 1), date(2026, 7, 31), self.bank)
+        self.assertTrue(any('Penerimaan Pinjaman' in r['uraian'] for r in rows))
+        self.assertTrue(any('Pembayaran Hutang' in r['uraian'] for r in rows))
+
     def test_rekening_koran_uses_legacy_v_mutasi_bank_sources(self):
         trx = BankTransaction.objects.create(
             tenant=self.tenant,
@@ -661,3 +690,39 @@ class ReportLayoutTests(TestCase):
         res_diff_year = self.client.get('/reports/rekap-pembayaran-invoice-customer/', {'start_date': '2025-06-01', 'end_date': '2026-06-30'})
         self.assertEqual(res_diff_year.status_code, 200)
         self.assertContains(res_diff_year, 'Periode Rekap Pembayaran Invoice Customer harus berada pada tahun yang sama.')
+
+    def test_loan_debt_reports_render_cleanly(self):
+        tenant = Tenant.objects.create(name='CV Debt Report Test')
+        user = get_user_model().objects.create_user(username='admin-dr-test')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        kas = ChartOfAccount.objects.create(tenant=tenant, kode='101', nama='Kas Utama', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        hutang_acc = ChartOfAccount.objects.create(tenant=tenant, kode='201', nama='Hutang Bank', saldo_normal=ChartOfAccount.NormalBalance.KREDIT, golongan='PASIVA', kelompok='KEWAJIBAN')
+        bank = BankAccount.objects.create(tenant=tenant, no_rekening='001', nama_bank='Kas Utama', atas_nama='CV Debt Report Test', akun=kas)
+        lender = StakeHolder.objects.create(tenant=tenant, kode='LEN-02', nama='Lender B', jenis=StakeHolder.StakeHolderType.CUSTOMER)
+
+        from finance.models import LoanDebt
+        debt = LoanDebt(
+            tenant=tenant,
+            tanggal=date(2026, 7, 1),
+            pemberi_pinjaman=lender,
+            perkiraan_hutang=hutang_acc,
+            bank=bank,
+            nominal=Decimal('5000000'),
+            keterangan='Pinjaman modal',
+        ).save_with_business_rules(user=user)
+
+        self.client.force_login(user)
+
+        # Rekap Transaksi Hutang
+        res1 = self.client.get('/reports/rekap-transaksi-hutang/', {'start_date': '2026-07-01', 'end_date': '2026-07-31'})
+        self.assertEqual(res1.status_code, 200)
+        self.assertContains(res1, f'/finance/hutang-pinjaman/{debt.uuid}/')
+
+        # Rekap Saldo Hutang
+        res2 = self.client.get('/reports/saldo-hutang/', {'end_date': '2026-07-31'})
+        self.assertEqual(res2.status_code, 200)
+        self.assertContains(res2, f'/finance/hutang-pinjaman/{debt.uuid}/')
+
+        # Rekap Pembayaran Hutang
+        res3 = self.client.get('/reports/rekap-pembayaran-hutang/', {'start_date': '2026-07-01', 'end_date': '2026-07-31'})
+        self.assertEqual(res3.status_code, 200)

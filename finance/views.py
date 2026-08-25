@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from accounting.models import Journal
 from accounting.services import generated_transaction_key
-from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase
+from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase, LoanDebt, LoanDebtPayment
 from master.models import ChartOfAccount
 
 
@@ -216,5 +216,87 @@ def cash_advance_payment_detail(request, uuid):
             'object': transaction,
             'journal': transaction_journal(request, transaction),
             'cancel_url': reverse('finance_pembayaran_kas_bon_list'),
+        },
+    )
+
+
+@login_required
+def loan_debt_lookup(request):
+    require_tenant(request)
+    from django.db.models import Q
+    from core.templatetags.crud_extras import format_money
+
+    q = request.GET.get('q', '').strip()
+    queryset = LoanDebt.objects.filter(
+        tenant=request.tenant,
+        is_deleted=False,
+        status_lunas='Belum',
+    ).select_related('pemberi_pinjaman')
+    if q:
+        queryset = queryset.filter(
+            Q(no_register__icontains=q)
+            | Q(pemberi_pinjaman__nama__icontains=q)
+            | Q(keterangan__icontains=q)
+        )
+    results = []
+    for debt in queryset.order_by('-tanggal', '-id')[:20]:
+        saldo_val = format_money(debt.saldo)
+        label = f"{debt.no_register} - {debt.pemberi_pinjaman.nama if debt.pemberi_pinjaman else ''} (Sisa: {saldo_val})"
+        results.append({
+            'id': debt.pk,
+            'label': label,
+            'no_register': debt.no_register,
+            'nama': debt.pemberi_pinjaman.nama if debt.pemberi_pinjaman else '',
+            'alamat': debt.pemberi_pinjaman.alamat if debt.pemberi_pinjaman else '',
+            'saldo': saldo_val,
+        })
+    return JsonResponse({'results': results})
+
+
+@login_required
+def loan_debt_detail(request, uuid):
+    require_tenant(request)
+    transaction = get_object_or_404(
+        LoanDebt.objects.filter(tenant=request.tenant, is_deleted=False).select_related(
+            'pemberi_pinjaman',
+            'perkiraan_hutang',
+            'perkiraan_kas',
+            'bank',
+        ),
+        uuid=uuid,
+    )
+    return render(
+        request,
+        'finance/loan_debt_detail.html',
+        {
+            'title': f'Detail Hutang Pinjaman {transaction.no_register}',
+            'object': transaction,
+            'journal': transaction_journal(request, transaction),
+            'cancel_url': reverse('finance_hutang_pinjaman_list'),
+        },
+    )
+
+
+@login_required
+def loan_debt_payment_detail(request, uuid):
+    require_tenant(request)
+    transaction = get_object_or_404(
+        LoanDebtPayment.objects.filter(tenant=request.tenant, is_deleted=False).select_related(
+            'hutang_pinjaman',
+            'hutang_pinjaman__pemberi_pinjaman',
+            'hutang_pinjaman__perkiraan_hutang',
+            'perkiraan_kas',
+            'bank',
+        ),
+        uuid=uuid,
+    )
+    return render(
+        request,
+        'finance/loan_debt_payment_detail.html',
+        {
+            'title': f'Detail Pembayaran Hutang {transaction.no_register}',
+            'object': transaction,
+            'journal': transaction_journal(request, transaction),
+            'cancel_url': reverse('finance_pembayaran_hutang_list'),
         },
     )

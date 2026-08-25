@@ -958,3 +958,227 @@ def rekap_pembayaran_invoice_customer(request):
             **filters,
         },
     )
+
+@login_required
+def rekap_transaksi_hutang(request):
+    require_tenant(request)
+    filters = month_report_filters(request)
+    if filters['start_date'].year != filters['end_date'].year:
+        from django.contrib import messages
+        messages.warning(request, 'Periode Rekap Transaksi Hutang harus berada pada tahun yang sama.')
+        filters['end_date'] = date(filters['start_date'].year, 12, 31)
+    rows = services.rekap_transaksi_hutang(request.tenant, filters['start_date'], filters['end_date'])
+    if request.GET.get('export') in {'excel', 'pdf'}:
+        period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
+        export_rows = [
+            [
+                (index, 'number'),
+                (row.tanggal.strftime('%d/%m/%y'), 'center'),
+                (row.no_register, 'text'),
+                (row.pemberi_pinjaman.nama if row.pemberi_pinjaman else '', 'text'),
+                (row.perkiraan_hutang.nama if row.perkiraan_hutang else '', 'text'),
+                (row.sumber_dana, 'text'),
+                (row.nominal, 'number'),
+                (row.pelunasan, 'number'),
+                (row.saldo, 'number'),
+                (row.created_by.username if row.created_by else '', 'text'),
+            ]
+            for index, row in enumerate(rows, start=1)
+        ]
+        headers = ['No', 'Tanggal', 'No Register', 'Pemberi Pinjaman', 'Akun Hutang', 'Penerima Uang', 'Nominal', 'Pelunasan', 'Saldo', 'Pc']
+        totals = [
+            ('Grand Total', 'text', 6),
+            (sum((row.nominal for row in rows), ZERO), 'number', 1),
+            (sum((row.pelunasan for row in rows), ZERO), 'number', 1),
+            (sum((row.saldo for row in rows), ZERO), 'number', 1),
+            ('', 'text', 1),
+        ]
+        if request.GET.get('export') == 'excel':
+            return legacy_report_excel_response('rekap-transaksi-hutang.xls', 'Rekap Transaksi Hutang', request.tenant, period, headers, export_rows, totals)
+        return legacy_report_pdf_response(
+            'rekap-transaksi-hutang.pdf',
+            'Rekap Transaksi Hutang',
+            request.tenant,
+            period,
+            [
+                {'label': 'No', 'x': 0, 'w': 25, 'max': 4, 'size': 8},
+                {'label': 'Tanggal', 'x': 25, 'w': 60, 'max': 8, 'size': 8},
+                {'label': 'No Register', 'x': 85, 'w': 120, 'max': 25, 'size': 8},
+                {'label': 'Pemberi Pinjaman', 'x': 205, 'w': 140, 'max': 25, 'size': 8},
+                {'label': 'Akun Hutang', 'x': 345, 'w': 110, 'max': 20, 'size': 8},
+                {'label': 'Penerima Uang', 'x': 455, 'w': 110, 'max': 20, 'size': 8},
+                {'label': 'Nominal', 'x': 565, 'w': 75, 'max': 14, 'size': 8},
+                {'label': 'Pelunasan', 'x': 640, 'w': 75, 'max': 14, 'size': 8},
+                {'label': 'Saldo', 'x': 715, 'w': 75, 'max': 14, 'size': 8},
+            ],
+            [row[:9] for row in export_rows],
+            [(0, 565, 'Grand Total', 'text', 6), (565, 75, sum((row.nominal for row in rows), ZERO), 'number', 1), (640, 75, sum((row.pelunasan for row in rows), ZERO), 'number', 1), (715, 75, sum((row.saldo for row in rows), ZERO), 'number', 1)],
+            landscape=True,
+        )
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    total_nominal = sum((row.nominal for row in rows), ZERO)
+    total_pelunasan = sum((row.pelunasan for row in rows), ZERO)
+    total_saldo = sum((row.saldo for row in rows), ZERO)
+    return render(
+        request,
+        'reports/rekap_transaksi_hutang.html',
+        {
+            'title': 'Rekap Transaksi Hutang',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_nominal': total_nominal,
+            'total_pelunasan': total_pelunasan,
+            'total_saldo': total_saldo,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )
+
+
+@login_required
+def rekap_pembayaran_hutang(request):
+    require_tenant(request)
+    filters = month_report_filters(request)
+    if filters['start_date'].year != filters['end_date'].year:
+        from django.contrib import messages
+        messages.warning(request, 'Periode Rekap Pembayaran Hutang harus berada pada tahun yang sama.')
+        filters['end_date'] = date(filters['start_date'].year, 12, 31)
+    rows = services.rekap_pembayaran_hutang(request.tenant, filters['start_date'], filters['end_date'])
+    if request.GET.get('export') in {'excel', 'pdf'}:
+        period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
+        export_rows = [
+            [
+                (index, 'number'),
+                (row.tanggal.strftime('%d/%m/%y'), 'center'),
+                (row.no_register, 'text'),
+                (row.hutang_pinjaman.no_register, 'text'),
+                (row.hutang_pinjaman.pemberi_pinjaman.nama if row.hutang_pinjaman.pemberi_pinjaman else '', 'text'),
+                (row.sumber_dana, 'text'),
+                (row.nominal, 'number'),
+                (row.created_by.username if row.created_by else '', 'text'),
+            ]
+            for index, row in enumerate(rows, start=1)
+        ]
+        headers = ['No', 'Tanggal', 'No Register', 'No Hutang', 'Pemberi Pinjaman', 'Sumber Uang', 'Pembayaran', 'Pc']
+        totals = [('Grand Total', 'text', 6), (sum((row.nominal for row in rows), ZERO), 'number', 1), ('', 'text', 1)]
+        if request.GET.get('export') == 'excel':
+            return legacy_report_excel_response('rekap-pembayaran-hutang.xls', 'Rekap Pembayaran Hutang', request.tenant, period, headers, export_rows, totals)
+        return legacy_report_pdf_response(
+            'rekap-pembayaran-hutang.pdf',
+            'Rekap Pembayaran Hutang',
+            request.tenant,
+            period,
+            [
+                {'label': 'No', 'x': 0, 'w': 25, 'max': 4, 'size': 8},
+                {'label': 'Tanggal', 'x': 25, 'w': 60, 'max': 8, 'size': 8},
+                {'label': 'No Register', 'x': 85, 'w': 125, 'max': 25, 'size': 8},
+                {'label': 'No Hutang', 'x': 210, 'w': 125, 'max': 25, 'size': 8},
+                {'label': 'Pemberi Pinjaman', 'x': 335, 'w': 140, 'max': 25, 'size': 8},
+                {'label': 'Sumber Uang', 'x': 475, 'w': 120, 'max': 20, 'size': 8},
+                {'label': 'Pembayaran', 'x': 595, 'w': 85, 'max': 14, 'size': 8},
+                {'label': 'Pc', 'x': 680, 'w': 50, 'max': 10, 'size': 8},
+            ],
+            [row[:8] for row in export_rows],
+            [(0, 595, 'Grand Total', 'text', 6), (595, 85, sum((row.nominal for row in rows), ZERO), 'number', 1)],
+            landscape=True,
+        )
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    total_nominal = sum((row.nominal for row in rows), ZERO)
+    return render(
+        request,
+        'reports/rekap_pembayaran_hutang.html',
+        {
+            'title': 'Rekap Pembayaran Hutang',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_nominal': total_nominal,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )
+
+
+@login_required
+def saldo_hutang(request):
+    require_tenant(request)
+    filters = report_filters(request)
+    end_date = filters['end_date'] or date.today()
+    filters['end_date'] = end_date
+    rows = services.saldo_hutang(request.tenant, end_date)
+    total_nominal = sum((row['nominal'] for row in rows), ZERO)
+    total_pelunasan = sum((row['pelunasan'] for row in rows), ZERO)
+    total_saldo = sum((row['saldo'] for row in rows), ZERO)
+
+    if request.GET.get('export') in {'excel', 'pdf'}:
+        period = end_date.strftime('%d/%m/%Y')
+        export_rows = [
+            [
+                (index, 'number'),
+                (row['tanggal'].strftime('%d/%m/%y'), 'center'),
+                (row['no_register'], 'text'),
+                (row['pemberi_pinjaman'], 'text'),
+                (row['alamat_pemberi_pinjaman'], 'text'),
+                (row['nominal'], 'number'),
+                (row['pelunasan'], 'number'),
+                (row['saldo'], 'number'),
+                (row['created_by'], 'text'),
+            ]
+            for index, row in enumerate(rows, start=1)
+        ]
+        if request.GET.get('export') == 'excel':
+            return legacy_report_excel_response(
+                'saldo-hutang.xls',
+                'Rekap Saldo Hutang',
+                request.tenant,
+                period,
+                ['No', 'Tanggal', 'No Register', 'Pemberi Pinjaman', 'Alamat', 'Nominal', 'Pelunasan', 'Saldo', 'Pc'],
+                export_rows,
+                [('Grand Total', 'text', 7), (total_saldo, 'number', 1), ('', 'text', 1)],
+            )
+        return legacy_report_pdf_response(
+            'saldo-hutang.pdf',
+            'Rekap Saldo Hutang',
+            request.tenant,
+            period,
+            [
+                {'label': 'No', 'x': 0, 'w': 25, 'max': 4, 'size': 8},
+                {'label': 'Tanggal', 'x': 25, 'w': 60, 'max': 8, 'size': 8},
+                {'label': 'No Register', 'x': 85, 'w': 130, 'max': 25, 'size': 8},
+                {'label': 'Pemberi Pinjaman', 'x': 215, 'w': 140, 'max': 25, 'size': 8},
+                {'label': 'Alamat', 'x': 355, 'w': 130, 'max': 25, 'size': 8},
+                {'label': 'Nominal', 'x': 485, 'w': 80, 'max': 14, 'size': 8},
+                {'label': 'Pelunasan', 'x': 565, 'w': 80, 'max': 14, 'size': 8},
+                {'label': 'Saldo', 'x': 645, 'w': 80, 'max': 14, 'size': 8},
+                {'label': 'Pc', 'x': 725, 'w': 40, 'max': 8, 'size': 8},
+            ],
+            [
+                [(row[0][0], row[0][1]), (row[1][0], row[1][1]), (row[2][0], row[2][1]), (row[3][0], row[3][1]), (row[4][0], row[4][1]), (row[5][0], row[5][1]), (row[6][0], row[6][1]), (row[7][0], row[7][1]), (row[8][0], row[8][1])]
+                for row in export_rows
+            ],
+            [(0, 645, 'Grand Total', 'text', 8), (645, 80, total_saldo, 'number', 1), (725, 40, '', 'text', 1)],
+            header_rgb=(0.90, 0.95, 0.98),
+            landscape=True,
+        )
+
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(
+        request,
+        'reports/saldo_hutang.html',
+        {
+            'title': 'Rekap Saldo Hutang',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_nominal': total_nominal,
+            'total_pelunasan': total_pelunasan,
+            'total_saldo': total_saldo,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )
