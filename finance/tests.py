@@ -434,3 +434,63 @@ class LoanDebtFeatureTests(TestCase):
         self.assertEqual(lines2[0].debet, Decimal('10000000'))
         self.assertEqual(lines2[1].perkiraan, self.kas)
         self.assertEqual(lines2[1].kredit, Decimal('10000000'))
+
+class LoanReceivableFeatureTests(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name='CV Piutang Test')
+        self.user = get_user_model().objects.create_user(username='admin-piutang-test', password='secret')
+        UserProfile.objects.create(user=self.user, tenant=self.tenant, role=UserProfile.Role.ADMIN)
+        self.kas = ChartOfAccount.objects.create(tenant=self.tenant, kode='101', nama='Kas Utama', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        self.piutang_acc = ChartOfAccount.objects.create(tenant=self.tenant, kode='102', nama='Piutang Pinjaman Subang', saldo_normal=ChartOfAccount.NormalBalance.DEBET, golongan='AKTIVA', kelompok='PIUTANG')
+        self.bank = BankAccount.objects.create(tenant=self.tenant, no_rekening='001', nama_bank='Bank BCA', atas_nama='CV Piutang Test', akun=self.kas)
+        self.borrower = StakeHolder.objects.create(tenant=self.tenant, kode='BOR-01', nama='Budi Subang', jenis=StakeHolder.StakeHolderType.CUSTOMER)
+
+    def test_loan_receivable_and_payment_journals_and_status(self):
+        from finance.models import LoanReceivable, LoanReceivablePayment
+
+        # 1. Create Loan Receivable (Disburse loan: Debet Piutang 2.000.000, Kredit Kas 2.000.000)
+        rec = LoanReceivable(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 1),
+            penerima_pinjaman=self.borrower,
+            perkiraan_piutang=self.piutang_acc,
+            bank=self.bank,
+            nominal=Decimal('2000000.00'),
+            keterangan='Pinjaman modal Budi',
+        )
+        rec.save_with_business_rules()
+
+        self.assertTrue(rec.no_register.startswith('PTG'))
+        self.assertEqual(rec.saldo, Decimal('2000000.00'))
+        self.assertEqual(rec.status_lunas, LoanReceivable.StatusLunas.BELUM)
+
+        # 2. Payment 1 (Receive payment: Debet Kas 800.000, Kredit Piutang 800.000)
+        pmt = LoanReceivablePayment(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 5),
+            piutang_pinjaman=rec,
+            bank=self.bank,
+            nominal=Decimal('800000.00'),
+            keterangan='Cicilan 1',
+        )
+        pmt.save_with_business_rules()
+
+        rec.refresh_from_db()
+        self.assertEqual(rec.pelunasan, Decimal('800000.00'))
+        self.assertEqual(rec.saldo, Decimal('1200000.00'))
+        self.assertEqual(rec.status_lunas, LoanReceivable.StatusLunas.BELUM)
+
+        # 3. Payment 2 Full (Receive payment: 1.200.000)
+        pmt2 = LoanReceivablePayment(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 10),
+            piutang_pinjaman=rec,
+            bank=self.bank,
+            nominal=Decimal('1200000.00'),
+            keterangan='Pelunasan',
+        )
+        pmt2.save_with_business_rules()
+
+        rec.refresh_from_db()
+        self.assertEqual(rec.saldo, Decimal('0.00'))
+        self.assertEqual(rec.status_lunas, LoanReceivable.StatusLunas.LUNAS)

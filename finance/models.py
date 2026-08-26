@@ -428,3 +428,125 @@ def refresh_loan_debt_status(debt):
 
 
 
+
+
+class LoanReceivable(TenantScopedModel):
+    class StatusLunas(models.TextChoices):
+        BELUM = 'Belum', 'Belum'
+        LUNAS = 'Lunas', 'Lunas'
+
+    no_register = models.CharField(max_length=50, blank=True)
+    tanggal = models.DateField()
+    penerima_pinjaman = models.ForeignKey('master.StakeHolder', related_name='loan_receivables', on_delete=models.PROTECT)
+    perkiraan_piutang = models.ForeignKey('master.ChartOfAccount', related_name='loan_receivables_account', on_delete=models.PROTECT)
+    perkiraan_kas = models.ForeignKey('master.ChartOfAccount', related_name='loan_receivables_cash', on_delete=models.PROTECT)
+    nominal = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    keterangan = models.TextField(blank=True)
+    bank = models.ForeignKey('master.BankAccount', null=True, blank=True, related_name='loan_receivables', on_delete=models.PROTECT)
+    sumber_dana = models.CharField(max_length=100, blank=True)
+    pelunasan = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    status_lunas = models.CharField(max_length=10, choices=StatusLunas.choices, default=StatusLunas.BELUM)
+
+    class Meta:
+        ordering = ['-tanggal', '-id']
+        constraints = [models.UniqueConstraint(fields=['tenant', 'no_register'], name='uniq_loanreceivable_tenant_no_register')]
+
+    def __str__(self):
+        return self.no_register or 'Piutang Pinjaman'
+
+    @property
+    def saldo(self):
+        return self.nominal - self.pelunasan
+
+    @transaction.atomic
+    def save_with_business_rules(self, user=None):
+        old = type(self).objects.filter(pk=self.pk).first() if self.pk else None
+        ensure_open_period(self.tenant, self.tanggal, old.tanggal if old else None)
+        if old and old.pelunasan > ZERO:
+            raise ValidationError('Piutang pinjaman tidak bisa diubah karena sudah ada pembayaran/pelunasan.')
+        if not self.penerima_pinjaman:
+            raise ValidationError('Penerima pinjaman belum dipilih.')
+        if not self.perkiraan_piutang:
+            raise ValidationError('Akun piutang belum dipilih.')
+        if not self.bank:
+            raise ValidationError('Bank/Kas belum dipilih.')
+        if not self.bank.akun:
+            raise ValidationError('Akun pada Kas/Bank wajib diisi di master Bank/Kas.')
+        if self.nominal <= ZERO:
+            raise ValidationError('Nominal belum diisi.')
+        self.perkiraan_kas = self.bank.akun
+        self.sumber_dana = str(self.bank)
+        assign_number(self, 'no_register', 'PTG')
+        self.status_lunas = self.StatusLunas.LUNAS if self.nominal <= self.pelunasan else self.StatusLunas.BELUM
+        self.save()
+        lines = [{'account': self.perkiraan_piutang, 'debet': self.nominal}, {'account': self.perkiraan_kas, 'kredit': self.nominal}]
+        refresh_journal(obj=self, no_jurnal=self.no_register, tanggal=self.tanggal, keterangan=self.keterangan, lines=lines, user=user)
+        return self
+
+    def delete_with_business_rules(self, user=None):
+        ensure_open_period(self.tenant, self.tanggal)
+        if self.pelunasan > ZERO:
+            raise ValidationError('Piutang pinjaman tidak bisa dihapus karena sudah ada pembayaran/pelunasan.')
+        delete_generated_journal(self)
+        self.delete()
+
+
+class LoanReceivablePayment(TenantScopedModel):
+    no_register = models.CharField(max_length=50, blank=True)
+    tanggal = models.DateField()
+    piutang_pinjaman = models.ForeignKey(LoanReceivable, related_name='payments', on_delete=models.PROTECT)
+    perkiraan_kas = models.ForeignKey('master.ChartOfAccount', related_name='loan_receivable_payments', on_delete=models.PROTECT)
+    nominal = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    keterangan = models.TextField(blank=True)
+    bank = models.ForeignKey('master.BankAccount', null=True, blank=True, related_name='loan_receivable_payments', on_delete=models.PROTECT)
+    sumber_dana = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        ordering = ['-tanggal', '-id']
+        constraints = [models.UniqueConstraint(fields=['tenant', 'no_register'], name='uniq_loanreceivablepayment_tenant_no_register')]
+
+    def __str__(self):
+        return self.no_register or 'Penerimaan Piutang'
+
+    @property
+    def saldo_piutang(self):
+        return self.piutang_pinjaman.nominal - self.nominal
+
+    @transaction.atomic
+    def save_with_business_rules(self, user=None):
+        old = type(self).objects.filter(pk=self.pk).first() if self.pk else None
+        ensure_open_period(self.tenant, self.tanggal, old.tanggal if old else None)
+        if not self.bank:
+            raise ValidationError('Via bank/kas belum dipilih.')
+        if not self.bank.akun:
+            raise ValidationError('Akun pada Kas/Bank wajib diisi di master Bank/Kas.')
+        if self.nominal <= ZERO:
+            raise ValidationError('Nominal belum diisi.')
+        paid_before_this = self.piutang_pinjaman.payments.filter(is_deleted=False).exclude(pk=self.pk).aggregate(total=Sum('nominal'))['total'] or ZERO
+        available_balance = self.piutang_pinjaman.nominal - paid_before_this
+        if self.nominal > available_balance:
+            raise ValidationError('Pembayaran melebihi saldo piutang.')
+        self.perkiraan_kas = self.bank.akun
+        self.sumber_dana = str(self.bank)
+        assign_number(self, 'no_register', 'BPTG')
+        self.save()
+        lines = [{'account': self.perkiraan_kas, 'debet': self.nominal}, {'account': self.piutang_pinjaman.perkiraan_piutang, 'kredit': self.nominal}]
+        refresh_journal(obj=self, no_jurnal=self.no_register, tanggal=self.tanggal, keterangan=self.keterangan, lines=lines, user=user)
+        refresh_loan_receivable_status(self.piutang_pinjaman)
+        if old and old.piutang_pinjaman_id != self.piutang_pinjaman_id:
+            refresh_loan_receivable_status(old.piutang_pinjaman)
+        return self
+
+    def delete_with_business_rules(self, user=None):
+        ensure_open_period(self.tenant, self.tanggal)
+        receivable = self.piutang_pinjaman
+        delete_generated_journal(self)
+        self.delete()
+        refresh_loan_receivable_status(receivable)
+
+
+def refresh_loan_receivable_status(receivable):
+    total = receivable.payments.filter(is_deleted=False).aggregate(total=Sum('nominal'))['total'] or ZERO
+    receivable.pelunasan = total
+    receivable.status_lunas = LoanReceivable.StatusLunas.LUNAS if receivable.nominal <= total else LoanReceivable.StatusLunas.BELUM
+    receivable.save(update_fields=['pelunasan', 'status_lunas', 'updated_at'])

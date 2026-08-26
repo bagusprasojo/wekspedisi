@@ -100,6 +100,19 @@
                                 <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_saldo_hutang' %}">Rekap Saldo Hutang</a>
                             </div>
                         </div>
+                        <div class="rounded px-3 py-2" x-data="{ open: localStorage.getItem('menu-piutang-pinjaman') !== 'closed' }">
+                            <button class="flex w-full items-center justify-between rounded py-1 text-left font-medium text-slate-700 hover:text-slate-900" type="button" x-on:click="open = !open; localStorage.setItem('menu-piutang-pinjaman', open ? 'open' : 'closed')">
+                                <span>Piutang Pinjaman</span>
+                                <span class="text-xs" x-text="open ? 'v' : '>'"></span>
+                            </button>
+                            <div class="mt-1 space-y-1 border-l pl-3" x-cloak x-show="open">
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'finance_piutang_pinjaman_list' %}">Input Piutang</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'finance_pembayaran_piutang_list' %}">Pembayaran Piutang</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekap_transaksi_piutang' %}">Rekap Transaksi Piutang</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_rekap_pembayaran_piutang' %}">Rekap Pembayaran Piutang</a>
+                                <a class="block rounded px-2 py-1.5 hover:bg-slate-100" href="{% url 'reports_saldo_piutang_pinjaman' %}">Rekap Saldo Piutang</a>
+                            </div>
+                        </div>
                         <div class="rounded px-3 py-2" x-data="{ open: localStorage.getItem('menu-invoice-customer') !== 'closed' }">
                             <button class="flex w-full items-center justify-between rounded py-1 text-left font-medium text-slate-700 hover:text-slate-900" type="button" x-on:click="open = !open; localStorage.setItem('menu-invoice-customer', open ? 'open' : 'closed')">
                                 <span>Invoice Customer</span>

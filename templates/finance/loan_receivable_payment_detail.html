@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="rounded border bg-white p-4 text-sm">
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div><p class="text-slate-500">No Register</p><p class="font-semibold">{{ object.no_register }}</p></div>
+            <div><p class="text-slate-500">No Piutang</p><p class="font-semibold">{{ object.piutang_pinjaman.no_register }}</p></div>
+            <div><p class="text-slate-500">Penerima Pinjaman</p><p class="font-semibold">{{ object.piutang_pinjaman.penerima_pinjaman }}</p></div>
+            <div><p class="text-slate-500">Tanggal</p><p class="font-semibold">{{ object.tanggal }}</p></div>
+            <div><p class="text-slate-500">Kas/Bank Penerima</p><p class="font-semibold">{{ object.bank|default:"-" }}</p></div>
+            <div><p class="text-slate-500">Nominal Pembayaran</p><p class="font-semibold">{{ object.nominal|format_money }}</p></div>
+        </div>
+        <div class="mt-4">
+            <p class="text-slate-500">Keterangan</p>
+            <p class="font-semibold">{{ object.keterangan|default:"-" }}</p>
+        </div>
+    </div>
+
+    <div class="overflow-hidden rounded border bg-white">
+        <div class="border-b bg-slate-50 px-4 py-3 text-sm font-semibold">Jurnal</div>
+        {% if journal %}
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-100 text-left text-slate-600">
+                <tr>
+                    <th class="px-4 py-3 font-medium">Kode Akun</th>
+                    <th class="px-4 py-3 font-medium">Akun</th>
+                    <th class="px-4 py-3 text-right font-medium">Debet</th>
+                    <th class="px-4 py-3 text-right font-medium">Kredit</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for line in journal.lines.all %}
+                <tr>
+                    <td class="px-4 py-3">{{ line.perkiraan.kode }}</td>
+                    <td class="px-4 py-3">{{ line.perkiraan.nama }}</td>
+                    <td class="px-4 py-3 text-right">{{ line.debet|format_money }}</td>
+                    <td class="px-4 py-3 text-right">{{ line.kredit|format_money }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="px-4 py-6 text-center text-sm text-slate-500">Belum ada jurnal.</div>
+        {% endif %}
+    </div>
+
+    <div class="flex gap-2">
+        <a class="rounded border px-4 py-2 text-sm hover:bg-slate-100" href="{{ cancel_url }}">Kembali</a>
+        {% if not object|is_closed_transaction %}
+        <a class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" href="{% url 'finance_pembayaran_piutang_update' object.uuid %}">Edit</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

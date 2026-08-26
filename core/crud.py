@@ -78,6 +78,42 @@ def populate_form_context(context, config, request, form=None, obj=None):
             context['initial_cash_advance_address'] = getattr(debt_obj.pemberi_pinjaman, 'alamat', '') if debt_obj.pemberi_pinjaman else ''
             context['initial_cash_advance_balance'] = format_money(saldo_val)
 
+    if model_name == 'loanreceivable':
+        acc_obj = getattr(obj, 'perkiraan_piutang', None) if obj else None
+        stk_obj = getattr(obj, 'penerima_pinjaman', None) if obj else None
+        if form and form.is_bound:
+            if not acc_obj and form.data.get('perkiraan_piutang'):
+                from master.models import ChartOfAccount
+                acc_obj = ChartOfAccount.objects.filter(pk=form.data.get('perkiraan_piutang'), tenant=tenant, is_deleted=False).first()
+            if not stk_obj and form.data.get('penerima_pinjaman'):
+                from master.models import StakeHolder
+                stk_obj = StakeHolder.objects.filter(pk=form.data.get('penerima_pinjaman'), tenant=tenant, is_deleted=False).first()
+        if acc_obj:
+            context['initial_account_label'] = str(acc_obj)
+        if stk_obj:
+            context['initial_penerima_pinjaman_label'] = str(stk_obj)
+
+    if model_name == 'loanreceivablepayment':
+        rec_obj = None
+        current_nominal = Decimal('0')
+        if obj and getattr(obj, 'piutang_pinjaman', None):
+            rec_obj = obj.piutang_pinjaman
+            current_nominal = obj.nominal or Decimal('0')
+        elif form and form.is_bound and form.data.get('piutang_pinjaman'):
+            from finance.models import LoanReceivable
+            rec_obj = LoanReceivable.objects.filter(pk=form.data.get('piutang_pinjaman'), tenant=tenant, is_deleted=False).first()
+            if form.data.get('nominal'):
+                try:
+                    current_nominal = Decimal(str(form.data.get('nominal')))
+                except Exception:
+                    pass
+        if rec_obj:
+            saldo_val = rec_obj.saldo + current_nominal
+            context['initial_loan_receivable_label'] = f"{rec_obj.no_register} - {rec_obj.penerima_pinjaman.nama if rec_obj.penerima_pinjaman else ''} (Sisa: {format_money(saldo_val)})"
+            context['initial_cash_advance_name'] = rec_obj.penerima_pinjaman.nama if rec_obj.penerima_pinjaman else ''
+            context['initial_cash_advance_address'] = getattr(rec_obj.penerima_pinjaman, 'alamat', '') if rec_obj.penerima_pinjaman else ''
+            context['initial_cash_advance_balance'] = format_money(saldo_val)
+
 
 from django import forms
 from django.contrib import messages
@@ -201,9 +237,21 @@ class TenantFormMixin(TenantRequiredMixin):
                         is_deleted=False,
                         parent=OuterRef('pk'),
                     )
-                    field.queryset = field.queryset.filter(
-                        Q(golongan='PASIVA') | Q(kelompok='KEWAJIBAN')
-                    ).annotate(has_children=Exists(child_accounts)).filter(has_children=False)
+                    field.queryset = field.queryset.filter(kelompok='KEWAJIBAN').annotate(has_children=Exists(child_accounts)).filter(has_children=False)
+                if form.__class__.__name__ == 'LoanReceivableForm' and field_name == 'perkiraan_piutang':
+                    from django.db.models import Exists, OuterRef, Q
+                    from master.models import ChartOfAccount
+                    child_accounts = ChartOfAccount.objects.filter(
+                        tenant=self.request.tenant,
+                        is_deleted=False,
+                        parent=OuterRef('pk'),
+                    )
+                    field.queryset = field.queryset.filter(kelompok='PIUTANG').annotate(has_children=Exists(child_accounts)).filter(has_children=False)
+                if form.__class__.__name__ == 'LoanReceivablePaymentForm' and field_name == 'piutang_pinjaman':
+                    current_rec_id = getattr(getattr(self, 'object', None), 'piutang_pinjaman_id', None)
+                    field.queryset = (
+                        field.queryset.filter(status_lunas='Belum') | field.queryset.filter(pk=current_rec_id)
+                    )
                 if form.__class__.__name__ == 'LoanDebtPaymentForm' and field_name == 'hutang_pinjaman':
                     current_debt_id = getattr(getattr(self, 'object', None), 'hutang_pinjaman_id', None)
                     field.queryset = (

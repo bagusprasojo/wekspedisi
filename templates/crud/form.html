@@ -15,7 +15,23 @@
             {% if form_model_name == 'armada' and field.name == 'driver_text' %}
                 <span class="relative block" x-data="autocompleteLookup('{% url 'master_lookup_stakeholder' %}?jenis=karyawan', 'id_driver', '{{ field.value|default_if_none:''|escapejs }}')" x-init="init()">
                 <input type="hidden" id="id_driver" name="driver" value="{{ form.driver.value|default:'' }}">
-                <input class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" placeholder="Cari/pilih driver..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false">
+                <input class="w-full rounded border px-3 py-2 text-sm" id="{{ field.id_for_label }}" name="{{ field.html_name }}" placeholder="Cari/pilih driver..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false">
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
+            {% elif form_model_name == 'loanreceivable' and field.name == 'perkiraan_piutang' %}
+            <span class="relative block" x-data="autocompleteLookup('{% url 'finance_transaksi_kas_account_lookup' %}?jenis=piutang', '{{ field.id_for_label }}', '{{ initial_account_label|default_if_none:''|escapejs }}')" x-init="init()">
+                <select class="absolute h-px w-px opacity-0" id="{{ field.id_for_label }}" name="{{ field.html_name }}" tabindex="-1" aria-hidden="true">
+                    <option value="">---------</option>
+                    {% for value, label in field.field.choices %}
+                    <option value="{{ value }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih akun piutang..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
                 <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
                     <template x-for="(item, index) in results" :key="item.id">
                         <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
@@ -24,14 +40,30 @@
                 </div>
             </span>
             {% elif form_model_name == 'loandebt' and field.name == 'perkiraan_hutang' %}
-            <span class="relative block" x-data="autocompleteLookup('{% url 'finance_transaksi_kas_account_lookup' %}', '{{ field.id_for_label }}', '{{ initial_account_label|default_if_none:''|escapejs }}')" x-init="init()">
+            <span class="relative block" x-data="autocompleteLookup('{% url 'finance_transaksi_kas_account_lookup' %}?jenis=hutang', '{{ field.id_for_label }}', '{{ initial_account_label|default_if_none:''|escapejs }}')" x-init="init()">
                 <select class="absolute h-px w-px opacity-0" id="{{ field.id_for_label }}" name="{{ field.html_name }}" tabindex="-1" aria-hidden="true">
                     <option value="">---------</option>
                     {% for value, label in field.field.choices %}
                     <option value="{{ value }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
-                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih akun hutang..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih akun hutang..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
+            {% elif form_model_name == 'loanreceivable' and field.name == 'penerima_pinjaman' %}
+            <span class="relative block" x-data="autocompleteLookup('{% url 'master_lookup_stakeholder' %}', '{{ field.id_for_label }}', '{{ initial_penerima_pinjaman_label|default_if_none:''|escapejs }}')" x-init="init()">
+                <select class="absolute h-px w-px opacity-0" id="{{ field.id_for_label }}" name="{{ field.html_name }}" tabindex="-1" aria-hidden="true">
+                    <option value="">---------</option>
+                    {% for value, label in field.field.choices %}
+                    <option value="{{ value }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih penerima pinjaman..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
                 <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
                     <template x-for="(item, index) in results" :key="item.id">
                         <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
@@ -47,7 +79,7 @@
                     <option value="{{ value }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
-                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih pemberi pinjaman..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih pemberi pinjaman..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
                 <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
                     <template x-for="(item, index) in results" :key="item.id">
                         <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
@@ -63,7 +95,7 @@
                     <option value="{{ value }}" {% if field.value|stringformat:'s' == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
-                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih akun biaya atau pendapatan..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari/pilih akun biaya atau pendapatan..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
                 <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
                     <template x-for="(item, index) in results" :key="item.id">
                         <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
@@ -74,7 +106,18 @@
             {% elif form_model_name == 'employeecashadvancepayment' and field.name == 'kas_bon_karyawan' %}
             <span class="relative block" x-data="autocompleteLookup('{% url 'finance_kas_bon_lookup' %}', '{{ field.id_for_label }}', '{{ initial_cash_advance_label|default_if_none:''|escapejs }}')" x-init="init()">
                 <input type="hidden" id="{{ field.id_for_label }}" name="{{ field.html_name }}" value="{{ field.value|default:'' }}" {% if field.field.required %}required{% endif %}>
-                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari no. register, nama karyawan, atau kas bon..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari no. register, nama karyawan, atau kas bon..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
+                    <template x-for="(item, index) in results" :key="item.id">
+                        <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
+                    </template>
+                    <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
+                </div>
+            </span>
+            {% elif form_model_name == 'loanreceivablepayment' and field.name == 'piutang_pinjaman' %}
+            <span class="relative block" x-data="autocompleteLookup('{% url 'finance_piutang_pinjaman_lookup' %}', '{{ field.id_for_label }}', '{{ initial_loan_receivable_label|default_if_none:''|escapejs }}')" x-init="init()">
+                <input type="hidden" id="{{ field.id_for_label }}" name="{{ field.html_name }}" value="{{ field.value|default:'' }}" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari no. register, penerima pinjaman, atau piutang..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
                 <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
                     <template x-for="(item, index) in results" :key="item.id">
                         <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
@@ -85,7 +128,7 @@
             {% elif form_model_name == 'loandebtpayment' and field.name == 'hutang_pinjaman' %}
             <span class="relative block" x-data="autocompleteLookup('{% url 'finance_hutang_pinjaman_lookup' %}', '{{ field.id_for_label }}', '{{ initial_loan_debt_label|default_if_none:''|escapejs }}')" x-init="init()">
                 <input type="hidden" id="{{ field.id_for_label }}" name="{{ field.html_name }}" value="{{ field.value|default:'' }}" {% if field.field.required %}required{% endif %}>
-                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari no. register, pemberi pinjaman, atau hutang..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari no. register, pemberi pinjaman, atau hutang..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
                 <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
                     <template x-for="(item, index) in results" :key="item.id">
                         <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
@@ -103,7 +146,7 @@
             {% elif field.name == 'armada' %}
             <span class="relative block" x-data="autocompleteLookup('{% url 'master_lookup_armada' %}', '{{ field.id_for_label }}', '{{ initial_armada_label|default_if_none:''|escapejs }}')" x-init="init()">
                 <input type="hidden" id="{{ field.id_for_label }}" name="{{ field.html_name }}" value="{{ field.value|default:'' }}" {% if field.field.required %}required{% endif %}>
-                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari nopol, jenis kendaraan, atau supir..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="open = results.length > 0" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
+                <input class="w-full rounded border px-3 py-2 text-sm" placeholder="Cari nopol, jenis kendaraan, atau supir..." type="text" x-model="term" x-on:input.debounce.250ms="search()" x-on:focus="search()" x-on:keydown.arrow-down.prevent="move(1)" x-on:keydown.arrow-up.prevent="move(-1)" x-on:keydown.enter.prevent="chooseActive()" x-on:keydown.escape="open = false" {% if field.field.required %}required{% endif %}>
                 <div class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow" x-show="open" x-on:click.outside="open = false">
                     <template x-for="(item, index) in results" :key="item.id">
                         <button class="block w-full px-3 py-2 text-left text-sm hover:bg-slate-100" type="button" x-on:mouseenter="activeIndex = index" x-on:mousedown.prevent="select(item)" x-bind:class="activeIndex === index ? 'bg-slate-100' : ''" x-text="item.label"></button>
@@ -111,6 +154,10 @@
                     <div class="px-3 py-2 text-sm text-slate-500" x-show="results.length === 0 && term.length > 0">Tidak ada data.</div>
                 </div>
             </span>
+            {% elif form_model_name == 'loanreceivable' and field.name == 'bank' %}
+            {{ field }}
+            {% elif form_model_name == 'loanreceivablepayment' and field.name == 'bank' %}
+            {{ field }}
             {% elif form_model_name == 'loandebt' and field.name == 'bank' %}
             {{ field }}
             {% elif form_model_name == 'loandebtpayment' and field.name == 'bank' %}
@@ -140,6 +187,21 @@
             </div>
             <div>
                 <p class="text-slate-500">Nama</p>
+                <p class="font-semibold" x-text="cashAdvanceName || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Alamat</p>
+                <p class="font-semibold" x-text="cashAdvanceAddress || '-'"></p>
+            </div>
+        </div>
+        {% elif form_model_name == 'loanreceivablepayment' and field.name == 'tanggal' %}
+        <div class="grid gap-3 rounded border bg-slate-50 p-3 text-sm md:col-span-2 md:grid-cols-3">
+            <div>
+                <p class="text-slate-500">Saldo Piutang</p>
+                <p class="font-semibold" x-text="cashAdvanceBalance || '-'"></p>
+            </div>
+            <div>
+                <p class="text-slate-500">Penerima Pinjaman</p>
                 <p class="font-semibold" x-text="cashAdvanceName || '-'"></p>
             </div>
             <div>
@@ -250,19 +312,17 @@ function autocompleteLookup(endpoint, hiddenId, initialLabel) {
             if (q !== this.selectedLabel && this.hidden) {
                 this.hidden.value = '';
             }
-            if (!q) {
-                this.selectedLabel = '';
-                this.results = [];
-                this.activeIndex = -1;
-                this.open = false;
-                return;
-            }
             const separator = endpoint.includes('?') ? '&' : '?';
-            const response = await fetch(`${endpoint}${separator}q=${encodeURIComponent(q)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-            const data = await response.json();
-            this.results = data.results || [];
-            this.activeIndex = this.results.length ? 0 : -1;
-            this.open = true;
+            try {
+                const response = await fetch(`${endpoint}${separator}q=${encodeURIComponent(q)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const data = await response.json();
+                this.results = Array.isArray(data) ? data : (data.results || []);
+                this.activeIndex = this.results.length ? 0 : -1;
+                this.open = this.results.length > 0;
+            } catch (e) {
+                this.results = [];
+                this.open = false;
+            }
         },
         move(step) {
             if (!this.open && this.results.length) this.open = true;
@@ -339,7 +399,7 @@ function transactionCalculator(modelName) {
                 if (e.detail && e.detail.hiddenId === 'id_armada' && e.detail.item) {
                     this.onArmadaSelected(e.detail.item);
                 }
-                if (e.detail && (e.detail.hiddenId === 'id_kas_bon_karyawan' || e.detail.hiddenId === 'id_hutang_pinjaman') && e.detail.item) {
+                if (e.detail && (e.detail.hiddenId === 'id_kas_bon_karyawan' || e.detail.hiddenId === 'id_hutang_pinjaman' || e.detail.hiddenId === 'id_piutang_pinjaman') && e.detail.item) {
                     this.setCashAdvanceInfo(e.detail.item);
                 }
             });

@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase, LoanDebt, LoanDebtPayment
+from .models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase, LoanDebt, LoanDebtPayment, LoanReceivable, LoanReceivablePayment
 
 COMMON_EXCLUDE = ['tenant', 'created_by', 'updated_by', 'is_deleted', 'deleted_at', 'deleted_by']
 
@@ -102,5 +102,27 @@ class LoanDebtPaymentForm(forms.ModelForm):
         labels = {
             'hutang_pinjaman': 'Hutang Pinjaman',
             'bank': 'Kas/Bank Sumber Uang',
+            'nominal': 'Nominal Pembayaran',
+        }
+
+
+class LoanReceivableForm(forms.ModelForm):
+    class Meta:
+        model = LoanReceivable
+        fields = ['perkiraan_piutang', 'penerima_pinjaman', 'tanggal', 'bank', 'nominal', 'keterangan']
+        labels = {
+            'perkiraan_piutang': 'Akun Piutang',
+            'penerima_pinjaman': 'Penerima Pinjaman',
+            'bank': 'Kas/Bank Sumber Uang',
+        }
+
+
+class LoanReceivablePaymentForm(forms.ModelForm):
+    class Meta:
+        model = LoanReceivablePayment
+        fields = ['piutang_pinjaman', 'tanggal', 'bank', 'nominal', 'keterangan']
+        labels = {
+            'piutang_pinjaman': 'Piutang Pinjaman',
+            'bank': 'Kas/Bank Penerima Uang',
             'nominal': 'Nominal Pembayaran',
         }

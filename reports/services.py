@@ -6,7 +6,7 @@ from django.db.models import Sum
 
 from accounting.models import ClosingBankBalance, Journal, JournalLine
 from accounting.services import normal_balance_amount
-from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase, LoanDebt, LoanDebtPayment
+from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase, LoanDebt, LoanDebtPayment, LoanReceivable, LoanReceivablePayment
 from invoice.models import CustomerInvoice, CustomerInvoicePayment
 from master.models import BankAccount, ChartOfAccount
 
@@ -306,6 +306,17 @@ def bank_mutasi_rows(tenant, bank, start_date=None, end_date=None):
         uraian = f'Pembayaran Hutang {debt.no_register} ({lender})' if lender else f'Pembayaran Hutang {debt.no_register}'
         rows.append({'id': row.id, 'order': 110, 'tanggal': row.tanggal, 'kode': '00', 'debet': row.nominal, 'kredit': ZERO, 'user_create': username(row), 'uraian': f'{uraian} [Via Pembayaran Hutang]'})
 
+    for row in in_range(LoanReceivable.objects.filter(tenant=tenant, is_deleted=False, bank=bank).select_related('penerima_pinjaman', 'created_by')):
+        borrower = row.penerima_pinjaman.nama if row.penerima_pinjaman else ''
+        uraian = f'Pencairan Pinjaman {row.no_register} kepada {borrower}' if borrower else f'Pencairan Pinjaman {row.no_register}'
+        rows.append({'id': row.id, 'order': 120, 'tanggal': row.tanggal, 'kode': '00', 'debet': row.nominal, 'kredit': ZERO, 'user_create': username(row), 'uraian': f'{uraian} [Via Piutang Pinjaman]'})
+
+    for row in in_range(LoanReceivablePayment.objects.filter(tenant=tenant, is_deleted=False, bank=bank).select_related('piutang_pinjaman__penerima_pinjaman', 'created_by')):
+        rec = row.piutang_pinjaman
+        borrower = rec.penerima_pinjaman.nama if rec and rec.penerima_pinjaman else ''
+        uraian = f'Penerimaan Piutang {rec.no_register} ({borrower})' if borrower else f'Penerimaan Piutang {rec.no_register}'
+        rows.append({'id': row.id, 'order': 130, 'tanggal': row.tanggal, 'kode': '00', 'debet': ZERO, 'kredit': row.nominal, 'user_create': username(row), 'uraian': f'{uraian} [Via Pembayaran Piutang]'})
+
     return rows
 
 def rekap_transaksi_kas_bon(tenant, start_date=None, end_date=None):
@@ -483,6 +494,66 @@ def saldo_piutang_customer(tenant, end_date=None):
             'customer_id': item.customer_id,
             'pekerjaan': item.pekerjaan,
             'total': item.total,
+            'pelunasan': paid,
+            'saldo': saldo,
+            'created_by': item.created_by.username if item.created_by else '',
+        })
+    return result
+
+
+def rekap_transaksi_piutang(tenant, start_date=None, end_date=None):
+    from finance.models import LoanReceivable
+    queryset = LoanReceivable.objects.filter(tenant=tenant, is_deleted=False).select_related(
+        'penerima_pinjaman',
+        'perkiraan_piutang',
+        'created_by',
+    )
+    queryset = filter_date_range(queryset, start_date, end_date)
+    return queryset.order_by('tanggal', 'id')
+
+
+def rekap_pembayaran_piutang(tenant, start_date=None, end_date=None):
+    from finance.models import LoanReceivablePayment
+    queryset = LoanReceivablePayment.objects.filter(tenant=tenant, is_deleted=False).select_related(
+        'piutang_pinjaman__penerima_pinjaman',
+        'piutang_pinjaman__perkiraan_piutang',
+        'perkiraan_kas',
+        'created_by',
+    )
+    queryset = filter_date_range(queryset, start_date, end_date)
+    return queryset.order_by('tanggal', 'id')
+
+
+def saldo_piutang_pinjaman(tenant, end_date=None):
+    from finance.models import LoanReceivable
+    queryset = LoanReceivable.objects.filter(tenant=tenant, is_deleted=False).select_related(
+        'penerima_pinjaman',
+        'perkiraan_piutang',
+        'created_by',
+    )
+    if end_date:
+        queryset = queryset.filter(tanggal__lte=end_date)
+
+    result = []
+    for item in queryset.order_by('penerima_pinjaman__nama', 'no_register'):
+        paid = (
+            item.payments.filter(is_deleted=False, tanggal__lte=end_date)
+            .aggregate(total=Sum('nominal'))['total']
+            or ZERO
+            if end_date
+            else item.payments.filter(is_deleted=False).aggregate(total=Sum('nominal'))['total'] or ZERO
+        )
+        saldo = item.nominal - paid
+        if saldo <= ZERO:
+            continue
+        result.append({
+            'id': item.pk,
+            'uuid': item.uuid,
+            'no_register': item.no_register,
+            'tanggal': item.tanggal,
+            'penerima_pinjaman': item.penerima_pinjaman.nama if item.penerima_pinjaman else '',
+            'alamat_penerima_pinjaman': getattr(item.penerima_pinjaman, 'alamat', '') if item.penerima_pinjaman else '',
+            'nominal': item.nominal,
             'pelunasan': paid,
             'saldo': saldo,
             'created_by': item.created_by.username if item.created_by else '',

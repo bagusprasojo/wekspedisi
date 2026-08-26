@@ -78,6 +78,7 @@ class ChartOfAccountForm(forms.ModelForm):
     ]
     KELOMPOK_CHOICES = [
         ('AKTIVA', 'AKTIVA'),
+        ('PIUTANG', 'PIUTANG'),
         ('PASIVA', 'PASIVA'),
         ('KEWAJIBAN', 'KEWAJIBAN'),
         ('EQUITAS', 'EQUITAS'),

@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from accounting.models import Journal
 from accounting.services import generated_transaction_key
-from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase, LoanDebt, LoanDebtPayment
+from finance.models import BankTransaction, CashTransaction, EmployeeCashAdvance, EmployeeCashAdvancePayment, FuelPurchase, LoanDebt, LoanDebtPayment, LoanReceivable, LoanReceivablePayment
 from master.models import ChartOfAccount
 
 
@@ -44,6 +44,8 @@ def cash_transaction_account_lookup(request):
     from django.db.models import Exists, OuterRef, Q
 
     q = request.GET.get('q', '').strip()
+    jenis = request.GET.get('jenis', '').strip().lower()
+
     child_accounts = ChartOfAccount.objects.filter(
         tenant=request.tenant,
         is_deleted=False,
@@ -54,6 +56,11 @@ def cash_transaction_account_lookup(request):
         .annotate(has_children=Exists(child_accounts))
         .filter(has_children=False)
     )
+    if jenis == 'piutang':
+        accounts = accounts.filter(kelompok='PIUTANG')
+    elif jenis == 'hutang':
+        accounts = accounts.filter(kelompok='KEWAJIBAN')
+
     if q:
         accounts = accounts.filter(Q(kode__icontains=q) | Q(nama__icontains=q))
     return JsonResponse({
@@ -298,5 +305,87 @@ def loan_debt_payment_detail(request, uuid):
             'object': transaction,
             'journal': transaction_journal(request, transaction),
             'cancel_url': reverse('finance_pembayaran_hutang_list'),
+        },
+    )
+
+
+@login_required
+def loan_receivable_lookup(request):
+    require_tenant(request)
+    from django.db.models import Q
+    from core.templatetags.crud_extras import format_money
+
+    q = request.GET.get('q', '').strip()
+    queryset = LoanReceivable.objects.filter(
+        tenant=request.tenant,
+        is_deleted=False,
+        status_lunas='Belum',
+    ).select_related('penerima_pinjaman')
+    if q:
+        queryset = queryset.filter(
+            Q(no_register__icontains=q)
+            | Q(penerima_pinjaman__nama__icontains=q)
+            | Q(keterangan__icontains=q)
+        )
+    results = []
+    for item in queryset.order_by('-tanggal', '-id')[:20]:
+        saldo_val = format_money(item.saldo)
+        label = f"{item.no_register} - {item.penerima_pinjaman.nama if item.penerima_pinjaman else ''} (Sisa: {saldo_val})"
+        results.append({
+            'id': item.pk,
+            'label': label,
+            'no_register': item.no_register,
+            'nama': item.penerima_pinjaman.nama if item.penerima_pinjaman else '',
+            'alamat': getattr(item.penerima_pinjaman, 'alamat', '') if item.penerima_pinjaman else '',
+            'saldo': saldo_val,
+        })
+    return JsonResponse(results, safe=False)
+
+
+@login_required
+def loan_receivable_detail(request, uuid):
+    require_tenant(request)
+    transaction = get_object_or_404(
+        LoanReceivable.objects.filter(tenant=request.tenant, is_deleted=False).select_related(
+            'penerima_pinjaman',
+            'perkiraan_piutang',
+            'perkiraan_kas',
+            'bank',
+        ),
+        uuid=uuid,
+    )
+    return render(
+        request,
+        'finance/loan_receivable_detail.html',
+        {
+            'title': f'Detail Piutang Pinjaman {transaction.no_register}',
+            'object': transaction,
+            'journal': transaction_journal(request, transaction),
+            'cancel_url': reverse('finance_piutang_pinjaman_list'),
+        },
+    )
+
+
+@login_required
+def loan_receivable_payment_detail(request, uuid):
+    require_tenant(request)
+    transaction = get_object_or_404(
+        LoanReceivablePayment.objects.filter(tenant=request.tenant, is_deleted=False).select_related(
+            'piutang_pinjaman',
+            'piutang_pinjaman__penerima_pinjaman',
+            'piutang_pinjaman__perkiraan_piutang',
+            'perkiraan_kas',
+            'bank',
+        ),
+        uuid=uuid,
+    )
+    return render(
+        request,
+        'finance/loan_receivable_payment_detail.html',
+        {
+            'title': f'Detail Pembayaran Piutang {transaction.no_register}',
+            'object': transaction,
+            'journal': transaction_journal(request, transaction),
+            'cancel_url': reverse('finance_pembayaran_piutang_list'),
         },
     )
