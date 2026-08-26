@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load crud_extras %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<form class="mb-4 flex flex-wrap items-end gap-3 rounded border bg-white p-4" method="get">
+    <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700" for="end_date">Sampai Tanggal</label>
+        <input class="rounded border px-3 py-2 text-sm" id="end_date" name="end_date" type="date" value="{{ end_date|date:'Y-m-d' }}">
+    </div>
+    <button class="rounded bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700" type="submit">Tampilkan</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="excel">Export Excel</button>
+    <button class="rounded border px-4 py-2 text-sm hover:bg-slate-100" name="export" type="submit" value="pdf">Export PDF</button>
+</form>
+
+<div class="overflow-hidden rounded border bg-white">
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-100 text-left text-slate-600">
+            <tr>
+                <th class="px-4 py-3 font-medium">No</th>
+                <th class="px-4 py-3 font-medium">Tanggal</th>
+                <th class="px-4 py-3 font-medium">No Invoice</th>
+                <th class="px-4 py-3 font-medium">Customer</th>
+                <th class="px-4 py-3 font-medium">Deskripsi Pekerjaan</th>
+                <th class="px-4 py-3 text-right font-medium">Total Invoice</th>
+                <th class="px-4 py-3 text-right font-medium">Pelunasan</th>
+                <th class="px-4 py-3 text-right font-medium">Sisa Piutang</th>
+                <th class="px-4 py-3 font-medium">Pc</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3">{% if page_obj %}{{ forloop.counter|add:page_obj.start_index|add:"-1" }}{% else %}{{ forloop.counter }}{% endif %}</td>
+                <td class="px-4 py-3">{{ row.tanggal|date:"d/m/Y" }}</td>
+                <td class="px-4 py-3 font-mono text-xs"><a class="font-semibold text-blue-600 underline hover:text-blue-800" href="{% url 'invoice_invoice_customer_detail' row.uuid %}" title="Lihat Detail Invoice">{{ row.no_invoice }}</a></td>
+                <td class="px-4 py-3 font-medium text-slate-900">{{ row.customer }}</td>
+                <td class="px-4 py-3">{{ row.pekerjaan|default:"-" }}</td>
+                <td class="px-4 py-3 text-right">{{ row.total|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ row.pelunasan|format_money }}</td>
+                <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ row.saldo|format_money }}</td>
+                <td class="px-4 py-3">{{ row.created_by|default:"" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td class="px-4 py-6 text-center text-slate-500" colspan="9">Belum ada data saldo piutang customer per tanggal ini.</td></tr>
+            {% endfor %}
+        </tbody>
+        {% if rows %}
+        <tfoot class="border-t bg-slate-50 font-semibold">
+            <tr>
+                <td class="px-4 py-3 text-right" colspan="5">Grand Total Saldo Piutang</td>
+                <td class="px-4 py-3 text-right">{{ total_total|format_money }}</td>
+                <td class="px-4 py-3 text-right">{{ total_pelunasan|format_money }}</td>
+                <td class="px-4 py-3 text-right font-bold text-emerald-600">{{ total_saldo|format_money }}</td>
+                <td class="px-4 py-3"></td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</div>
+
+{% if is_paginated %}
+<div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+    <div class="flex items-center gap-1">
+        {% if page_obj.number > 1 %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page=1&end_date={{ end_date|date:'Y-m-d' }}">Pertama</a>
+        {% endif %}
+        {% if page_obj.has_previous %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.previous_page_number }}&end_date={{ end_date|date:'Y-m-d' }}">Sebelumnya</a>
+        {% endif %}
+    </div>
+    <span class="rounded border bg-white px-3 py-2 font-medium">Halaman {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    <div class="flex items-center gap-1">
+        {% if page_obj.has_next %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.next_page_number }}&end_date={{ end_date|date:'Y-m-d' }}">Berikutnya</a>
+        {% endif %}
+        {% if page_obj.number < page_obj.paginator.num_pages %}
+        <a class="rounded border bg-white px-3 py-2 hover:bg-slate-100" href="?page={{ page_obj.paginator.num_pages }}&end_date={{ end_date|date:'Y-m-d' }}">Terakhir</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -22,6 +22,91 @@ def require_weasyprint():
         raise SkipTest(f'WeasyPrint native dependency belum tersedia: {exc}') from exc
 
 
+    def test_saldo_piutang_customer_report_and_export(self):
+        from invoice.models import CustomerInvoice, CustomerInvoicePayment
+        from master.models import StakeHolder
+        cust = StakeHolder.objects.create(tenant=self.tenant, kode='CUST-PIU', nama='Customer Piutang Test', jenis=StakeHolder.StakeHolderType.CUSTOMER)
+        
+        # 1. Invoice dengan sisa piutang > 0
+        inv1 = CustomerInvoice.objects.create(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 1),
+            no_invoice='INV-PIU-001',
+            customer=cust,
+            pekerjaan='Jasa Angkut Subang',
+            total=Decimal('1000000.00'),
+            created_by=self.user,
+        )
+        CustomerInvoicePayment.objects.create(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 5),
+            tagihan_customer=inv1,
+            bank=self.bank,
+            nominal_kas=Decimal('300000.00'),
+            created_by=self.user,
+        )
+
+        # 2. Invoice lunas (saldo = 0, harus dikecualikan)
+        inv2 = CustomerInvoice.objects.create(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 2),
+            no_invoice='INV-PIU-002',
+            customer=cust,
+            pekerjaan='Jasa Angkut Bandung',
+            total=Decimal('500000.00'),
+            created_by=self.user,
+        )
+        CustomerInvoicePayment.objects.create(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 5),
+            tagihan_customer=inv2,
+            bank=self.bank,
+            nominal_kas=Decimal('500000.00'),
+            created_by=self.user,
+        )
+
+        # 3. Invoice kelebihan bayar (saldo < 0, harus tetap muncul)
+        inv3 = CustomerInvoice.objects.create(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 3),
+            no_invoice='INV-PIU-003',
+            customer=cust,
+            pekerjaan='Jasa Angkut Jakarta',
+            total=Decimal('400000.00'),
+            created_by=self.user,
+        )
+        CustomerInvoicePayment.objects.create(
+            tenant=self.tenant,
+            tanggal=date(2026, 8, 5),
+            tagihan_customer=inv3,
+            bank=self.bank,
+            nominal_kas=Decimal('450000.00'),
+            created_by=self.user,
+        )
+
+        rows = services.saldo_piutang_customer(self.tenant, date(2026, 8, 10))
+        # inv1 (saldo 700.000) dan inv3 (saldo -50.000) harus muncul. inv2 (saldo 0) tidak muncul.
+        no_invoices = [r['no_invoice'] for r in rows]
+        self.assertIn('INV-PIU-001', no_invoices)
+        self.assertIn('INV-PIU-003', no_invoices)
+        self.assertNotIn('INV-PIU-002', no_invoices)
+
+        # Test View GET
+        UserProfile.objects.create(user=self.user, tenant=self.tenant, role=UserProfile.Role.ADMIN)
+        self.client.force_login(self.user)
+        res = self.client.get('/reports/saldo-piutang-customer/?end_date=2026-08-10')
+        self.assertEqual(res.status_code, 200)
+
+        # Test Export PDF
+        res_pdf = self.client.get('/reports/saldo-piutang-customer/?end_date=2026-08-10&export=pdf')
+        self.assertEqual(res_pdf.status_code, 200)
+        self.assertEqual(res_pdf['Content-Type'], 'application/pdf')
+
+        # Test Export Excel
+        res_xls = self.client.get('/reports/saldo-piutang-customer/?end_date=2026-08-10&export=excel')
+        self.assertEqual(res_xls.status_code, 200)
+        self.assertEqual(res_xls['Content-Type'], 'application/vnd.ms-excel')
+
 class RekeningKoranLegacyMutationTests(TestCase):
     def setUp(self):
         self.tenant = Tenant.objects.create(name='CV Test')

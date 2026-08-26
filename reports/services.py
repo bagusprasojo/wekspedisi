@@ -453,3 +453,38 @@ def saldo_hutang(tenant, end_date=None):
             'created_by': item.created_by.username if item.created_by else '',
         })
     return result
+
+
+def saldo_piutang_customer(tenant, end_date=None):
+    from invoice.models import CustomerInvoice
+    cutoff = end_date or date.today()
+    queryset = CustomerInvoice.objects.filter(
+        tenant=tenant,
+        is_deleted=False,
+        tanggal__lte=cutoff,
+    ).select_related('customer', 'created_by')
+
+    result = []
+    for item in queryset.order_by('customer__nama', 'no_invoice'):
+        paid = (
+            item.payments.filter(is_deleted=False, tanggal__lte=cutoff)
+            .aggregate(total=Sum('nominal_kas') + Sum('pph'))['total']
+            or ZERO
+        )
+        saldo = item.total - paid
+        if saldo == ZERO:
+            continue
+        result.append({
+            'id': item.pk,
+            'uuid': item.uuid,
+            'no_invoice': item.no_invoice,
+            'tanggal': item.tanggal,
+            'customer': item.customer.nama if item.customer else '',
+            'customer_id': item.customer_id,
+            'pekerjaan': item.pekerjaan,
+            'total': item.total,
+            'pelunasan': paid,
+            'saldo': saldo,
+            'created_by': item.created_by.username if item.created_by else '',
+        })
+    return result

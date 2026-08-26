@@ -1182,3 +1182,85 @@ def saldo_hutang(request):
             **filters,
         },
     )
+
+
+@login_required
+def saldo_piutang_customer(request):
+    require_tenant(request)
+    filters = report_filters(request)
+    end_date = filters['end_date'] or date.today()
+    filters['end_date'] = end_date
+    rows = services.saldo_piutang_customer(request.tenant, end_date)
+    total_total = sum((row['total'] for row in rows), ZERO)
+    total_pelunasan = sum((row['pelunasan'] for row in rows), ZERO)
+    total_saldo = sum((row['saldo'] for row in rows), ZERO)
+
+    if request.GET.get('export') in {'excel', 'pdf'}:
+        period = end_date.strftime('%d/%m/%Y')
+        export_rows = [
+            [
+                (index, 'number'),
+                (row['tanggal'].strftime('%d/%m/%y'), 'center'),
+                (row['no_invoice'], 'text'),
+                (row['customer'], 'text'),
+                (row['pekerjaan'], 'text'),
+                (row['total'], 'number'),
+                (row['pelunasan'], 'number'),
+                (row['saldo'], 'number'),
+                (row['created_by'], 'text'),
+            ]
+            for index, row in enumerate(rows, start=1)
+        ]
+        if request.GET.get('export') == 'excel':
+            return legacy_report_excel_response(
+                'saldo-piutang-customer.xls',
+                'Rekap Saldo Piutang Customer',
+                request.tenant,
+                period,
+                ['No', 'Tanggal', 'No Invoice', 'Customer', 'Deskripsi Pekerjaan', 'Total Invoice', 'Pelunasan', 'Sisa Piutang', 'Pc'],
+                export_rows,
+                [('Grand Total', 'text', 5), (total_total, 'number', 1), (total_pelunasan, 'number', 1), (total_saldo, 'number', 1), ('', 'text', 1)],
+            )
+        return legacy_report_pdf_response(
+            'saldo-piutang-customer.pdf',
+            'Rekap Saldo Piutang Customer',
+            request.tenant,
+            period,
+            [
+                {'label': 'No', 'x': 0, 'w': 25, 'max': 4, 'size': 8},
+                {'label': 'Tanggal', 'x': 25, 'w': 60, 'max': 8, 'size': 8},
+                {'label': 'No Invoice', 'x': 85, 'w': 120, 'max': 25, 'size': 8},
+                {'label': 'Customer', 'x': 205, 'w': 140, 'max': 25, 'size': 8},
+                {'label': 'Pekerjaan', 'x': 345, 'w': 140, 'max': 25, 'size': 8},
+                {'label': 'Total', 'x': 485, 'w': 80, 'max': 14, 'size': 8},
+                {'label': 'Pelunasan', 'x': 565, 'w': 80, 'max': 14, 'size': 8},
+                {'label': 'Saldo', 'x': 645, 'w': 80, 'max': 14, 'size': 8},
+                {'label': 'Pc', 'x': 725, 'w': 40, 'max': 8, 'size': 8},
+            ],
+            [
+                [(row[0][0], row[0][1]), (row[1][0], row[1][1]), (row[2][0], row[2][1]), (row[3][0], row[3][1]), (row[4][0], row[4][1]), (row[5][0], row[5][1]), (row[6][0], row[6][1]), (row[7][0], row[7][1]), (row[8][0], row[8][1])]
+                for row in export_rows
+            ],
+            [(0, 485, 'Grand Total', 'text', 5), (485, 80, total_total, 'number', 1), (565, 80, total_pelunasan, 'number', 1), (645, 80, total_saldo, 'number', 1), (725, 40, '', 'text', 1)],
+            header_rgb=(0.90, 0.95, 0.98),
+            landscape=True,
+        )
+
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(
+        request,
+        'reports/saldo_piutang_customer.html',
+        {
+            'title': 'Rekap Saldo Piutang Customer',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_total': total_total,
+            'total_pelunasan': total_pelunasan,
+            'total_saldo': total_saldo,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )

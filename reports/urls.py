@@ -20,4 +20,5 @@ urlpatterns = [
     path('rekap-transaksi-hutang/', views.rekap_transaksi_hutang, name='reports_rekap_transaksi_hutang'),
     path('rekap-pembayaran-hutang/', views.rekap_pembayaran_hutang, name='reports_rekap_pembayaran_hutang'),
     path('saldo-hutang/', views.saldo_hutang, name='reports_saldo_hutang'),
+    path('saldo-piutang-customer/', views.saldo_piutang_customer, name='reports_saldo_piutang_customer'),
 ]
