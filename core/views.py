@@ -8,7 +8,7 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from core.templatetags.crud_extras import format_money
-from finance.models import CashTransaction, EmployeeCashAdvance, FuelPurchase
+from finance.models import CashTransaction, EmployeeCashAdvance, FuelPurchase, LoanDebt, LoanReceivable
 from invoice.models import CustomerInvoice
 from master.models import Armada
 from reports.services import saldo_bank
@@ -78,6 +78,26 @@ def dashboard_summary_api(request):
     # 6. Jumlah Armada Aktif
     armada_count = Armada.objects.filter(tenant=tenant, is_deleted=False).count()
 
+    # 7. Hutang Pinjaman Belum Lunas
+    unpaid_debt_qs = LoanDebt.objects.filter(
+        tenant=tenant, is_deleted=False, status_lunas='Belum'
+    )
+    debt_agg = unpaid_debt_qs.aggregate(
+        total_saldo=Sum(F('nominal') - F('pelunasan'))
+    )
+    total_hutang_pinjaman = debt_agg['total_saldo'] or ZERO
+    debt_count = unpaid_debt_qs.count()
+
+    # 8. Piutang Pinjaman Belum Lunas
+    unpaid_receivable_qs = LoanReceivable.objects.filter(
+        tenant=tenant, is_deleted=False, status_lunas='Belum'
+    )
+    rec_agg = unpaid_receivable_qs.aggregate(
+        total_saldo=Sum(F('nominal') - F('pelunasan'))
+    )
+    total_piutang_pinjaman = rec_agg['total_saldo'] or ZERO
+    receivable_count = unpaid_receivable_qs.count()
+
     # 7. 5 Invoice Belum Lunas Terbaru
     recent_unpaid = []
     for inv in unpaid_invoices_qs.select_related('customer').order_by('-tanggal', '-id')[:5]:
@@ -129,6 +149,10 @@ def dashboard_summary_api(request):
         'total_pelunasan_month': format_money(total_pelunasan_month),
         'total_pengeluaran_kas': format_money(total_pengeluaran_kas),
         'armada_count': armada_count,
+        'total_hutang_pinjaman': format_money(total_hutang_pinjaman),
+        'debt_count': debt_count,
+        'total_piutang_pinjaman': format_money(total_piutang_pinjaman),
+        'receivable_count': receivable_count,
         'recent_unpaid_invoices': recent_unpaid,
         'recent_transactions': combined[:5],
     })

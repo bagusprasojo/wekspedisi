@@ -28,77 +28,121 @@
     </div>
 
     <!-- Top 4 KPI Metrics -->
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <!-- Metric 1: Piutang Customer -->
-        <div class="rounded-lg border bg-white p-4 shadow-sm">
+    <!-- Baris 1: Saldo Kas & Bank, BBM Bulan Ini, Hutang Pinjaman -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Metric 1: Saldo Kas & Bank -->
+        <a href="{% url 'reports_saldo_bank' %}" class="block rounded-lg border bg-white p-4 shadow-sm hover:border-emerald-500 hover:shadow-md transition">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-medium uppercase tracking-wider text-slate-500">Piutang Customer</span>
-                <span class="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800" x-text="data.unpaid_count !== undefined ? data.unpaid_count + ' Invoice' : '...'"></span>
-            </div>
-            <div class="mt-2 text-xl font-bold text-slate-900">
-                <template x-if="loading"><div class="h-7 w-32 animate-pulse rounded bg-slate-200"></div></template>
-                <template x-if="!loading"><span x-text="'Rp ' + (data.total_piutang || '0')"></span></template>
-            </div>
-            <p class="mt-1 text-xs text-slate-500">Total invoice belum pelunasan</p>
-        </div>
-
-        <!-- Metric 2: Saldo Kas & Bank -->
-        <div class="rounded-lg border bg-white p-4 shadow-sm">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-medium uppercase tracking-wider text-slate-500">Saldo Kas & Bank</span>
-                <span class="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Aktif</span>
+                <span class="text-xs font-medium uppercase tracking-wider text-slate-500 group-hover:text-emerald-600">Saldo Kas & Bank</span>
+                <span class="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Aktif &rarr;</span>
             </div>
             <div class="mt-2 text-xl font-bold text-emerald-600">
                 <template x-if="loading"><div class="h-7 w-32 animate-pulse rounded bg-slate-200"></div></template>
                 <template x-if="!loading"><span x-text="'Rp ' + (data.total_saldo_kas_bank || '0')"></span></template>
             </div>
             <p class="mt-1 text-xs text-slate-500">Akumulasi kas & seluruh bank</p>
-        </div>
+        </a>
 
-        <!-- Metric 3: Kas Bon Karyawan -->
-        <div class="rounded-lg border bg-white p-4 shadow-sm">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-medium uppercase tracking-wider text-slate-500">Kas Bon Karyawan</span>
-                <span class="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">Pinjaman</span>
-            </div>
-            <div class="mt-2 text-xl font-bold text-slate-900">
-                <template x-if="loading"><div class="h-7 w-32 animate-pulse rounded bg-slate-200"></div></template>
-                <template x-if="!loading"><span x-text="'Rp ' + (data.total_kas_bon || '0')"></span></template>
-            </div>
-            <p class="mt-1 text-xs text-slate-500">Saldo hutang kas bon aktif</p>
-        </div>
-
-        <!-- Metric 4: Biaya BBM Bulan Ini -->
-        <div class="rounded-lg border bg-white p-4 shadow-sm">
+        <!-- Metric 2: Biaya BBM Bulan Ini -->
+        <a href="{% url 'reports_riwayat_pembelian_bbm' %}" class="block rounded-lg border bg-white p-4 shadow-sm hover:border-rose-500 hover:shadow-md transition">
             <div class="flex items-center justify-between">
                 <span class="text-xs font-medium uppercase tracking-wider text-slate-500">BBM Bulan Ini</span>
-                <span class="rounded bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800">Operasional</span>
+                <span class="rounded bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800">Operasional &rarr;</span>
             </div>
             <div class="mt-2 text-xl font-bold text-slate-900">
                 <template x-if="loading"><div class="h-7 w-32 animate-pulse rounded bg-slate-200"></div></template>
                 <template x-if="!loading"><span x-text="'Rp ' + (data.total_bbm_month || '0')"></span></template>
             </div>
             <p class="mt-1 text-xs text-slate-500">Pengeluaran BBM bulan ini</p>
-        </div>
+        </a>
+
+        <!-- Metric 3: Hutang Pinjaman -->
+        <a href="{% url 'reports_saldo_hutang' %}" class="block rounded-lg border bg-white p-4 shadow-sm hover:border-purple-500 hover:shadow-md transition">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium uppercase tracking-wider text-slate-500">Hutang Pinjaman</span>
+                <span class="rounded bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800" x-text="data.debt_count !== undefined ? data.debt_count + ' Transaksi →' : '...'"></span>
+            </div>
+            <div class="mt-2 text-xl font-bold text-slate-900">
+                <template x-if="loading"><div class="h-7 w-32 animate-pulse rounded bg-slate-200"></div></template>
+                <template x-if="!loading"><span x-text="'Rp ' + (data.total_hutang_pinjaman || '0')"></span></template>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Total sisa hutang pinjaman aktif</p>
+        </a>
+    </div>
+
+    <!-- Baris 2: Piutang Customer, Piutang Pinjaman, Kas Bon Karyawan -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Metric 4: Piutang Customer -->
+        <a href="{% url 'reports_saldo_piutang_customer' %}" class="block rounded-lg border bg-white p-4 shadow-sm hover:border-amber-500 hover:shadow-md transition">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium uppercase tracking-wider text-slate-500">Piutang Customer</span>
+                <span class="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800" x-text="data.unpaid_count !== undefined ? data.unpaid_count + ' Invoice →' : '...'"></span>
+            </div>
+            <div class="mt-2 text-xl font-bold text-slate-900">
+                <template x-if="loading"><div class="h-7 w-32 animate-pulse rounded bg-slate-200"></div></template>
+                <template x-if="!loading"><span x-text="'Rp ' + (data.total_piutang || '0')"></span></template>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Total invoice belum pelunasan</p>
+        </a>
+
+        <!-- Metric 5: Piutang Pinjaman -->
+        <a href="{% url 'reports_saldo_piutang_pinjaman' %}" class="block rounded-lg border bg-white p-4 shadow-sm hover:border-indigo-500 hover:shadow-md transition">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium uppercase tracking-wider text-slate-500">Piutang Pinjaman</span>
+                <span class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800" x-text="data.receivable_count !== undefined ? data.receivable_count + ' Transaksi →' : '...'"></span>
+            </div>
+            <div class="mt-2 text-xl font-bold text-slate-900">
+                <template x-if="loading"><div class="h-7 w-32 animate-pulse rounded bg-slate-200"></div></template>
+                <template x-if="!loading"><span x-text="'Rp ' + (data.total_piutang_pinjaman || '0')"></span></template>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Total sisa piutang pinjaman aktif</p>
+        </a>
+
+        <!-- Metric 6: Kas Bon Karyawan -->
+        <a href="{% url 'reports_saldo_kas_bon' %}" class="block rounded-lg border bg-white p-4 shadow-sm hover:border-blue-500 hover:shadow-md transition">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-medium uppercase tracking-wider text-slate-500">Kas Bon Karyawan</span>
+                <span class="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">Pinjaman &rarr;</span>
+            </div>
+            <div class="mt-2 text-xl font-bold text-slate-900">
+                <template x-if="loading"><div class="h-7 w-32 animate-pulse rounded bg-slate-200"></div></template>
+                <template x-if="!loading"><span x-text="'Rp ' + (data.total_kas_bon || '0')"></span></template>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Saldo hutang kas bon aktif</p>
+        </a>
     </div>
 
     <!-- Middle Row: Operational Summary Cards -->
     <div class="grid gap-4 md:grid-cols-3">
-        <div class="rounded-lg border bg-white p-4 shadow-sm">
-            <p class="text-xs text-slate-500">Omset Sales Invoice Bulan Ini</p>
+        <!-- Metric 7: Omset Sales Invoice -->
+        <a href="{% url 'reports_rekap_invoice_customer' %}" class="block rounded-lg border bg-white p-4 shadow-sm hover:border-slate-400 hover:shadow-md transition">
+            <div class="flex items-center justify-between">
+                <p class="text-xs text-slate-500">Omset Sales Invoice Bulan Ini</p>
+                <span class="text-xs text-slate-400">&rarr;</span>
+            </div>
             <p class="mt-1 text-lg font-bold text-slate-800" x-text="loading ? '...' : 'Rp ' + (data.total_omset_month || '0')"></p>
             <p class="mt-2 text-xs text-slate-500">Pelunasan Diterima: <span class="font-semibold text-emerald-600" x-text="loading ? '...' : 'Rp ' + (data.total_pelunasan_month || '0')"></span></p>
-        </div>
-        <div class="rounded-lg border bg-white p-4 shadow-sm">
-            <p class="text-xs text-slate-500">Total Pengeluaran Kas Bulan Ini</p>
+        </a>
+
+        <!-- Metric 8: Total Pengeluaran Kas -->
+        <a href="{% url 'reports_rekap_transaksi_kas' %}" class="block rounded-lg border bg-white p-4 shadow-sm hover:border-rose-400 hover:shadow-md transition">
+            <div class="flex items-center justify-between">
+                <p class="text-xs text-slate-500">Total Pengeluaran Kas Bulan Ini</p>
+                <span class="text-xs text-slate-400">&rarr;</span>
+            </div>
             <p class="mt-1 text-lg font-bold text-rose-600" x-text="loading ? '...' : 'Rp ' + (data.total_pengeluaran_kas || '0')"></p>
             <p class="mt-2 text-xs text-slate-500">Kas keluar operasional kantor</p>
-        </div>
-        <div class="rounded-lg border bg-white p-4 shadow-sm">
-            <p class="text-xs text-slate-500">Armada Terdaftar & Aktif</p>
+        </a>
+
+        <!-- Metric 9: Armada Terdaftar -->
+        <a href="{% url 'master_armada_list' %}" class="block rounded-lg border bg-white p-4 shadow-sm hover:border-slate-400 hover:shadow-md transition">
+            <div class="flex items-center justify-between">
+                <p class="text-xs text-slate-500">Armada Terdaftar & Aktif</p>
+                <span class="text-xs text-slate-400">&rarr;</span>
+            </div>
             <p class="mt-1 text-lg font-bold text-slate-800" x-text="loading ? '...' : (data.armada_count || '0') + ' Unit'"></p>
             <p class="mt-2 text-xs text-slate-500">Siap beroperasi melayani pengiriman</p>
-        </div>
+        </a>
     </div>
 
     <!-- Bottom Row: 2 Actionable Tables -->
