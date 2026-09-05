@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
@@ -99,7 +99,8 @@ class CustomerInvoice(TenantScopedModel):
         self.perkiraan_piutang = get_config_account(self.tenant, 'PIUTANG_JASA_ID')
         if not self.no_invoice:
             self.no_invoice = next_invoice_number(self.tenant, self.tanggal, model=type(self))
-        self.ppn = (self.nilai_pekerjaan * LEGACY_PPN_RATE / Decimal('100')).quantize(Decimal('0.01'))
+        dpp_val = (self.nilai_pekerjaan * Decimal('11') / Decimal('12')).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+        self.ppn = (dpp_val * Decimal('12') / Decimal('100')).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
         if self.ppn <= ZERO:
             raise ValidationError('Nilai PPN belum diisi.')
         self.total = self.nilai_pekerjaan + self.ppn

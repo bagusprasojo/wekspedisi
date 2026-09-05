@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from html import escape
 
 from django.contrib.auth.decorators import login_required
@@ -126,7 +126,7 @@ def customer_invoice_slip(request, uuid):
         CustomerInvoice.objects.filter(tenant=request.tenant, is_deleted=False).select_related('customer'),
         uuid=uuid,
     )
-    dpp = (invoice.nilai_pekerjaan * Decimal('11') / Decimal('12')).quantize(Decimal('0.01'))
+    dpp = (invoice.nilai_pekerjaan * Decimal('11') / Decimal('12')).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
     payment_text = get_config_value(request.tenant, 'INVOICE_PAYMENT_TEXT')
     admin_name = get_config_value(request.tenant, 'INVOICE_ADMIN_NAME')
     return render(

@@ -291,7 +291,11 @@
         <section class="sheet">
             <div class="top-date"><span>Date:</span><span>{% now "d/m/Y H:i" %}</span></div>
             <header class="header">
-                <img class="logo" src="{% static 'reports/logo.png' %}" alt="">
+                {% if tenant.logo %}
+                <img class="logo" src="{{ tenant.logo.url }}" alt="Logo {{ tenant.name }}">
+                {% else %}
+                <img class="logo" src="{% static 'reports/logo.png' %}" alt="Logo">
+                {% endif %}
                 <div>
                     <div class="company-name">{{ tenant.name }}</div>
                     <div class="company-line">Office : {{ tenant.address }}{% if tenant.city %}, Kabupaten {{ tenant.city }}{% endif %}</div>
