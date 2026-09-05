@@ -127,7 +127,8 @@ def customer_invoice_slip(request, uuid):
         uuid=uuid,
     )
     dpp = (invoice.nilai_pekerjaan * Decimal('11') / Decimal('12')).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
-    payment_text = get_config_value(request.tenant, 'INVOICE_PAYMENT_TEXT')
+    bank_name = get_config_value(request.tenant, 'INVOICE_BANK_NAME')
+    bank_norek = get_config_value(request.tenant, 'INVOICE_BANK_NOREK')
     admin_name = get_config_value(request.tenant, 'INVOICE_ADMIN_NAME')
     return render(
         request,
@@ -135,7 +136,8 @@ def customer_invoice_slip(request, uuid):
         {
             'object': invoice,
             'dpp': dpp,
-            'payment_text': payment_text,
+            'bank_name': bank_name,
+            'bank_norek': bank_norek,
             'admin_name': admin_name,
             'tenant': request.tenant,
         },

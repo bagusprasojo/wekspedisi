@@ -37,7 +37,8 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
         TenantConfig.objects.create(tenant=self.tenant, kode='AKUN_PPH_ID', nilai=str(self.pph_account.pk))
         TenantConfig.objects.create(tenant=self.tenant, kode='INVOICE_CODE', nilai='INV_TBL')
         TenantConfig.objects.create(tenant=self.tenant, kode='INVOICE_ADMIN_NAME', nilai='Admin Tenant')
-        TenantConfig.objects.create(tenant=self.tenant, kode='INVOICE_PAYMENT_TEXT', nilai='Transfer Bank Test\nCV Test')
+        TenantConfig.objects.create(tenant=self.tenant, kode='INVOICE_BANK_NAME', nilai='Bank Mandiri')
+        TenantConfig.objects.create(tenant=self.tenant, kode='INVOICE_BANK_NOREK', nilai='138.002.2313964')
         self.bank = BankAccount.objects.create(
             tenant=self.tenant,
             no_rekening='001',
@@ -230,10 +231,10 @@ class CustomerInvoiceLegacyRuleTests(TestCase):
             pekerjaan='Ongkos kirim',
             nilai_pekerjaan=Decimal('1000000'),
         ).save_with_business_rules(user=self.user)
-        TenantConfig.objects.filter(tenant=self.tenant, kode='INVOICE_PAYMENT_TEXT').delete()
+        TenantConfig.objects.filter(tenant=self.tenant, kode='INVOICE_BANK_NOREK').delete()
 
         self.client.force_login(self.user)
         response = self.client.get(f'/invoice/invoice-customer/{invoice.uuid}/slip/')
 
         self.assertEqual(response.status_code, 400)
-        self.assertContains(response, 'Konfigurasi invoice belum lengkap. Hubungi superadmin untuk melengkapi config tenant: INVOICE_PAYMENT_TEXT.', status_code=400)
+        self.assertContains(response, 'Konfigurasi invoice belum lengkap. Hubungi superadmin untuk melengkapi config tenant: INVOICE_BANK_NOREK.', status_code=400)

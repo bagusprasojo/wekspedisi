@@ -12,7 +12,7 @@ from core.services import next_invoice_number
 ZERO = Decimal('0')
 LEGACY_PPN_PERCENT = Decimal('12')
 LEGACY_PPN_RATE = Decimal('11')
-REQUIRED_INVOICE_CONFIGS = ['INVOICE_CODE', 'INVOICE_ADMIN_NAME', 'INVOICE_PAYMENT_TEXT']
+REQUIRED_INVOICE_CONFIGS = ['INVOICE_CODE', 'INVOICE_ADMIN_NAME', 'INVOICE_BANK_NAME', 'INVOICE_BANK_NOREK']
 SATUAN = [
     '', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas',
 ]

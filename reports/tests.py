@@ -674,7 +674,8 @@ class ReportLayoutTests(TestCase):
         TenantConfig.objects.create(tenant=tenant, kode='AKUN_PPN_ID', nilai=str(ppn_acc.pk))
         TenantConfig.objects.create(tenant=tenant, kode='INVOICE_CODE', nilai='INV_TEST')
         TenantConfig.objects.create(tenant=tenant, kode='INVOICE_ADMIN_NAME', nilai='Admin Test')
-        TenantConfig.objects.create(tenant=tenant, kode='INVOICE_PAYMENT_TEXT', nilai='BCA 1234')
+        TenantConfig.objects.create(tenant=tenant, kode='INVOICE_BANK_NAME', nilai='Bank BCA')
+        TenantConfig.objects.create(tenant=tenant, kode='INVOICE_BANK_NOREK', nilai='1234')
 
         customer = StakeHolder.objects.create(tenant=tenant, kode='CUS-10', nama='Customer A', jenis=StakeHolder.StakeHolderType.CUSTOMER)
 
@@ -731,7 +732,8 @@ class ReportLayoutTests(TestCase):
         TenantConfig.objects.create(tenant=tenant, kode='AKUN_PPN_ID', nilai=str(ppn_acc.pk))
         TenantConfig.objects.create(tenant=tenant, kode='INVOICE_CODE', nilai='INV_TEST')
         TenantConfig.objects.create(tenant=tenant, kode='INVOICE_ADMIN_NAME', nilai='Admin Test')
-        TenantConfig.objects.create(tenant=tenant, kode='INVOICE_PAYMENT_TEXT', nilai='BCA 1234')
+        TenantConfig.objects.create(tenant=tenant, kode='INVOICE_BANK_NAME', nilai='Bank BCA')
+        TenantConfig.objects.create(tenant=tenant, kode='INVOICE_BANK_NOREK', nilai='1234')
 
         customer = StakeHolder.objects.create(tenant=tenant, kode='CUS-10', nama='Customer A', jenis=StakeHolder.StakeHolderType.CUSTOMER)
 

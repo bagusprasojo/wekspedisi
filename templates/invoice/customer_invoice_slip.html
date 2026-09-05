@@ -348,8 +348,7 @@
 
                 <div class="footer-pay">
                     <div class="payment-label">Pembayaran Melalui :</div>
-                    <div class="payment-text">Transfer Bank Mandiri No Rek. 138.002.2313964
-CV. Tampir Baru Logistik</div>
+                    <div class="payment-text">Transfer {{ bank_name|default:"Bank Mandiri" }} No Rek : {{ bank_norek|default:"-" }}<br>{{ tenant.name }}</div>
                 </div>
 
                 <div class="signature">
