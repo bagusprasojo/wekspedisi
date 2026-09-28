@@ -366,6 +366,62 @@ class ReportLayoutTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.content.startswith(b'%PDF'))
 
+    def test_rekap_transaksi_kas_armada_view_and_export(self):
+        tenant = Tenant.objects.create(name='CV Armada Test')
+        user = get_user_model().objects.create_user(username='driveruser')
+        UserProfile.objects.create(user=user, tenant=tenant, role=UserProfile.Role.ADMIN)
+        kas = ChartOfAccount.objects.create(tenant=tenant, kode='101', nama='Kas', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        biaya = ChartOfAccount.objects.create(tenant=tenant, kode='501', nama='Biaya Operational', saldo_normal=ChartOfAccount.NormalBalance.DEBET)
+        bank = BankAccount.objects.create(tenant=tenant, no_rekening='001', nama_bank='Kas', atas_nama='CV Armada Test', akun=kas)
+        armada1 = Armada.objects.create(tenant=tenant, nopol='B 1234 ABC', kendaraan='Tronton Hino')
+        armada2 = Armada.objects.create(tenant=tenant, nopol='B 5678 XYZ', kendaraan='Engkel Isuzu')
+
+        CashTransaction.objects.create(
+            tenant=tenant,
+            no_bukti='KAS-ARM-1',
+            tanggal=date(2026, 8, 1),
+            akun_kas=kas,
+            akun_transaksi=biaya,
+            bank=bank,
+            armada=armada1,
+            nominal_keluar=Decimal('500000'),
+            created_by=user,
+        )
+        CashTransaction.objects.create(
+            tenant=tenant,
+            no_bukti='KAS-ARM-2',
+            tanggal=date(2026, 8, 2),
+            akun_kas=kas,
+            akun_transaksi=biaya,
+            bank=bank,
+            armada=armada2,
+            nominal_keluar=Decimal('750000'),
+            created_by=user,
+        )
+
+        self.client.force_login(user)
+        # Test HTML View without armada filter
+        res_all = self.client.get('/reports/rekap-transaksi-kas-armada/', {'start_date': '2026-08-01', 'end_date': '2026-08-31'})
+        self.assertEqual(res_all.status_code, 200)
+        self.assertEqual(len(res_all.context['rows']), 2)
+
+        # Test HTML View filtered by armada1
+        res_arm1 = self.client.get('/reports/rekap-transaksi-kas-armada/', {'start_date': '2026-08-01', 'end_date': '2026-08-31', 'armada': str(armada1.pk)})
+        self.assertEqual(res_arm1.status_code, 200)
+        self.assertEqual(len(res_arm1.context['rows']), 1)
+        self.assertEqual(res_arm1.context['rows'][0].armada, armada1)
+
+        # Test Export Excel
+        res_excel = self.client.get('/reports/rekap-transaksi-kas-armada/', {'start_date': '2026-08-01', 'end_date': '2026-08-31', 'armada': str(armada1.pk), 'export': 'excel'})
+        self.assertEqual(res_excel.status_code, 200)
+        self.assertEqual(res_excel['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+        # Test Export PDF
+        require_weasyprint()
+        res_pdf = self.client.get('/reports/rekap-transaksi-kas-armada/', {'start_date': '2026-08-01', 'end_date': '2026-08-31', 'armada': str(armada1.pk), 'export': 'pdf'})
+        self.assertEqual(res_pdf.status_code, 200)
+        self.assertTrue(res_pdf.content.startswith(b'%PDF'))
+
     def test_riwayat_pembelian_bbm_pdf_pc_and_distance_columns_have_room(self):
         require_weasyprint()
         tenant = Tenant.objects.create(name='CV Test')

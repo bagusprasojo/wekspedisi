@@ -418,6 +418,111 @@ def rekap_transaksi_kas(request):
         },
     )
 
+
+@login_required
+def rekap_transaksi_kas_armada(request):
+    require_tenant(request)
+    filters = month_report_filters(request)
+    if filters['start_date'].year != filters['end_date'].year:
+        from django.contrib import messages
+        messages.warning(request, 'Periode Rekap Transaksi Kas Armada harus berada pada tahun yang sama.')
+        filters['end_date'] = date(filters['start_date'].year, 12, 31)
+
+    armadas = Armada.objects.filter(tenant=request.tenant, is_deleted=False).select_related('driver').order_by('nopol')
+    armada = None
+    armada_id = request.GET.get('armada')
+    if armada_id:
+        armada = armadas.filter(pk=armada_id).first()
+
+    rows = services.rekap_transaksi_kas_armada(
+        request.tenant, filters['start_date'], filters['end_date'], armada=armada
+    )
+
+    if request.GET.get('export') in {'excel', 'pdf'}:
+        headers = ['No', 'Tanggal', 'Armada', 'Account & Keterangan', 'Keluar', 'Masuk', 'Pc']
+        period = f"{filters['start_date'].strftime('%d/%m/%Y')} s.d. {filters['end_date'].strftime('%d/%m/%Y')}"
+        export_rows = [
+            [
+                (index, 'number'),
+                (row.tanggal.strftime('%d/%m/%y'), 'center'),
+                (f'{row.armada.nopol} - {row.armada.kendaraan}' if row.armada else '-', 'text'),
+                (f'{row.akun_transaksi.kode} {row.akun_transaksi.nama}' + (f', {row.keterangan}' if row.keterangan else ''), 'text'),
+                (row.nominal_keluar, 'number'),
+                (row.nominal_masuk, 'number'),
+                (row.created_by.username if row.created_by else '', 'text'),
+            ]
+            for index, row in enumerate(rows, start=1)
+        ]
+        extra_lines = []
+        if armada:
+            extra_lines = [
+                f'Armada : {armada.nopol} - {armada.kendaraan} (Driver: {armada.driver.nama if armada.driver else "-"})'
+            ]
+        title = 'Rekap Transaksi Kas Armada'
+        if request.GET.get('export') == 'excel':
+            return legacy_report_excel_response(
+                'rekap-transaksi-kas-armada.xls',
+                title,
+                request.tenant,
+                period,
+                headers,
+                export_rows,
+                [
+                    ('Total', 'text', 4),
+                    (sum((row.nominal_keluar for row in rows), ZERO), 'number', 1),
+                    (sum((row.nominal_masuk for row in rows), ZERO), 'number', 1),
+                    ('', 'text', 1),
+                ],
+                extra_lines=extra_lines,
+                header_color='#b6d2e9',
+            )
+        return legacy_report_pdf_response(
+            'rekap-transaksi-kas-armada.pdf',
+            title,
+            request.tenant,
+            period,
+            [
+                {'label': 'No', 'x': 0, 'w': 28, 'max': 4},
+                {'label': 'Tanggal', 'x': 28, 'w': 52, 'max': 8},
+                {'label': 'Armada', 'x': 80, 'w': 100, 'max': 18},
+                {'label': 'Account & Keterangan', 'x': 180, 'w': 160, 'max': 30},
+                {'label': 'Keluar', 'x': 340, 'w': 75, 'max': 14},
+                {'label': 'Masuk', 'x': 415, 'w': 75, 'max': 14},
+                {'label': 'Pc', 'x': 490, 'w': 64, 'max': 12},
+            ],
+            export_rows,
+            [
+                (0, 340, 'Total   ', 'text', 4),
+                (340, 75, sum((row.nominal_keluar for row in rows), ZERO), 'number', 1),
+                (415, 75, sum((row.nominal_masuk for row in rows), ZERO), 'number', 1),
+                (490, 64, '', 'text', 1),
+            ],
+            extra_lines=extra_lines,
+            header_rgb=(0.71, 0.82, 0.91),
+        )
+
+    paginator = Paginator(rows, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    total_keluar = sum((row.nominal_keluar for row in rows), ZERO)
+    total_masuk = sum((row.nominal_masuk for row in rows), ZERO)
+    return render(
+        request,
+        'reports/rekap_transaksi_kas_armada.html',
+        {
+            'title': 'Rekap Transaksi Kas Armada',
+            'rows': page_obj.object_list,
+            'page_obj': page_obj,
+            'is_paginated': page_obj.has_other_pages(),
+            'total_keluar': total_keluar,
+            'total_masuk': total_masuk,
+            'armadas': armadas,
+            'selected_armada': armada,
+            'export_excel_pdf': True,
+            **filters,
+        },
+    )
+
+
 @login_required
 def riwayat_pembelian_bbm(request):
     require_tenant(request)

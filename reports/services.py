@@ -215,6 +215,18 @@ def rekap_transaksi_kas(tenant, start_date=None, end_date=None):
     queryset = filter_date_range(queryset, start_date, end_date)
     return queryset.order_by('tanggal', 'id')
 
+def rekap_transaksi_kas_armada(tenant, start_date=None, end_date=None, armada=None):
+    queryset = CashTransaction.objects.filter(tenant=tenant, is_deleted=False).select_related(
+        'akun_transaksi',
+        'bank',
+        'armada',
+        'created_by',
+    )
+    if armada:
+        queryset = queryset.filter(armada=armada)
+    queryset = filter_date_range(queryset, start_date, end_date)
+    return queryset.order_by('tanggal', 'id')
+
 def riwayat_pembelian_bbm(tenant, start_date=None, end_date=None, armada=None):
     if not armada:
         return FuelPurchase.objects.none()
